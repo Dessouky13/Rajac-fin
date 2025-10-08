@@ -359,7 +359,7 @@ cron.schedule('5 9 * * *', async () => {
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`\n🚀 RAJAC Finance System API Server`);
   console.log(`📍 Server running on port ${PORT}`);
   console.log(`🌐 API Base URL: http://localhost:${PORT}`);
@@ -376,6 +376,9 @@ app.listen(PORT, () => {
   console.log(`   POST   /api/bank/deposit - Record bank deposit`);
   console.log(`   GET    /api/bank/deposits - Get all bank deposits`);
   console.log(`   GET    /api/analytics - Get financial analytics`);
+  console.log(`   GET    /api/teachers - Get all teachers`);
+  console.log(`   POST   /api/teachers - Add new teacher`);
+  console.log(`   POST   /api/teachers/payment - Pay teacher`);
   console.log(`   GET    /api/config/installments - Get installment dates`);
   console.log(`   PUT    /api/config/installments - Update installment dates`);
   console.log(`   GET    /api/config - Get all configuration`);
@@ -386,18 +389,17 @@ app.listen(PORT, () => {
   console.log(`   - Daily payment reminders: 10:00 AM`);
   console.log(`\n✅ Server is ready to accept requests\n`);
 
-  // Initialize Google Sheets asynchronously
-  googleSheets.initializeSpreadsheet().then(() => {
+  try {
+    console.log('Initializing Google Sheets...');
+    await googleSheets.initializeSpreadsheet();
     console.log('✅ Google Sheets initialized successfully\n');
-  }).catch((error) => {
+  } catch (error) {
     console.error('⚠️  Warning: Failed to initialize Google Sheets:', error.message);
     console.log('You can manually initialize by calling POST /api/init\n');
-  });
+  }
 });
 
-// Keep the process alive
-setInterval(() => {}, 1000);
-
+// Search for a student by ID or name
 app.get('/api/students/search/:identifier', async (req, res) => {
   try {
     const { identifier } = req.params;
@@ -423,6 +425,7 @@ app.get('/api/students/search/:identifier', async (req, res) => {
   }
 });
 
+// Get all students
 app.get('/api/students', async (req, res) => {
   try {
     const students = await studentService.getAllStudents();
@@ -440,6 +443,7 @@ app.get('/api/students', async (req, res) => {
   }
 });
 
+// Process a student payment
 app.post('/api/payments/process', async (req, res) => {
   try {
     const {
@@ -479,6 +483,7 @@ app.post('/api/payments/process', async (req, res) => {
   }
 });
 
+// Apply a discount to a student
 app.post('/api/payments/apply-discount', async (req, res) => {
   try {
     const { studentId, discountPercent } = req.body;
@@ -509,6 +514,7 @@ app.post('/api/payments/apply-discount', async (req, res) => {
   }
 });
 
+// Record an in/out transaction
 app.post('/api/finance/transaction', async (req, res) => {
   try {
     const {
@@ -559,6 +565,7 @@ app.post('/api/finance/transaction', async (req, res) => {
   }
 });
 
+// Get all transactions with optional filtering
 app.get('/api/finance/transactions', async (req, res) => {
   try {
     const { startDate, endDate, type } = req.query;
@@ -583,6 +590,7 @@ app.get('/api/finance/transactions', async (req, res) => {
   }
 });
 
+// Record a bank deposit
 app.post('/api/bank/deposit', async (req, res) => {
   try {
     const { amount, bankName, depositedBy, notes } = req.body;

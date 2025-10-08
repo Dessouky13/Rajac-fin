@@ -109,12 +109,9 @@ async function apiSend<T>(endpoint: string, payload: Record<string, any>, method
 // POST API call for form submissions
 async function apiPost<T>(action: string, payload: Record<string, any>): Promise<ApiResponse<T>> {
   try {
-    const url = API_BASE_URL;
+    const url = `${API_BASE_URL}${action}`;
 
-    // Include action in the JSON body as required by backend
-    const body = { action, ...payload };
-    
-    console.log('API POST Call:', url, body);
+    console.log('API POST Call:', url, payload);
 
     const response = await fetch(url, {
       method: 'POST',
@@ -122,7 +119,7 @@ async function apiPost<T>(action: string, payload: Record<string, any>): Promise
         'Content-Type': 'application/json',
       },
       mode: 'cors',
-      body: JSON.stringify(body),
+      body: JSON.stringify(payload),
     });
 
     console.log('API POST Response Status:', response.status);
@@ -134,11 +131,11 @@ async function apiPost<T>(action: string, payload: Record<string, any>): Promise
     const result = await response.json();
     console.log('API POST Response Data:', result);
     
-    // Backend returns: {ok: true, msg: "..."} or {ok: false, msg: "..."}
-    if (result && result.ok) {
+    // Backend returns: {success: true, ...} or {success: false, ...}
+    if (result && result.success) {
       return {
         ok: true,
-        data: result.saved || result.data || result,
+        data: result.data || result.teacher || result,
         message: result.msg || result.message
       };
     } else {
@@ -353,6 +350,28 @@ interface DueReportItem {
   balance: number;
   dueDate: string;
   overdue: boolean;
+}
+
+// Teachers API
+export async function getTeachers(): Promise<ApiResponse<any[]>> {
+  return apiGet('/teachers');
+}
+
+export async function addTeacher(teacher: {
+  name: string;
+  subject: string;
+  numberOfClasses: number;
+  totalAmount: number;
+}): Promise<ApiResponse<any>> {
+  return apiPost('/teachers', teacher);
+}
+
+export async function payTeacher(payment: {
+  teacherName: string;
+  amount: number;
+  method: string;
+}): Promise<ApiResponse<any>> {
+  return apiPost('/teachers/payment', payment);
 }
 
 // Implement as needed based on backend endpoint

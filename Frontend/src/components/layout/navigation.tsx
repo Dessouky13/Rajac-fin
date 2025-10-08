@@ -9,7 +9,8 @@ import {
   Calendar, 
   PiggyBank,
   Home,
-  FileSpreadsheet
+  FileSpreadsheet,
+  GraduationCap
 } from "lucide-react";
 
 interface NavItem {
@@ -53,6 +54,14 @@ const navItems: NavItem[] = [
     icon: PiggyBank, 
     descriptionAr: "لوحة الأرصدة",
     descriptionEn: "Balance dashboard"
+  },
+  { 
+    id: "teachers", 
+    labelAr: "إدارة المعلمين", 
+    labelEn: "Teachers Management",
+    icon: GraduationCap, 
+    descriptionAr: "إدارة معلومات المعلمين والمواد الدراسية",
+    descriptionEn: "Manage teacher information and subjects"
   },
 ];
 

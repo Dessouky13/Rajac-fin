@@ -144,8 +144,8 @@ class GoogleSheetsService {
 
   async initializeTeachersSheet() {
     const headers = [
-      'Teacher_ID', 'Name', 'Subject', 'Phone_Number', 
-      'Email', 'Hire_Date', 'Status'
+      'ID', 'Name', 'Subject', 'Number_Of_Classes', 
+      'Total_Amount', 'Total_Paid', 'Remaining_Balance', 'Created_At'
     ];
 
     await this.updateSheetHeaders('Teachers', headers);

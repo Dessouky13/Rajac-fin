@@ -5,6 +5,7 @@ import { Fees } from "@/components/sections/fees";
 import { DueReport } from "@/components/sections/due-report";
 import { Transactions } from "@/components/sections/transactions";
 import { Balances } from "@/components/sections/balances";
+import { Teachers } from "@/components/sections/teachers";
 
 const Index = () => {
   const [activeSection, setActiveSection] = useState("fees");
@@ -19,6 +20,8 @@ const Index = () => {
         return <Transactions />;
       case "balances":
         return <Balances />;
+      case "teachers":
+        return <Teachers />;
       default:
         return <Fees />;
     }
