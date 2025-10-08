@@ -11,6 +11,7 @@ const studentService = require('./services/studentService');
 const financeService = require('./services/financeService');
 const paymentDueService = require('./services/paymentDueService');
 const driveWatcher = require('./services/driveWatcher');
+const teachersService = require('./services/teachersService');
 // const whatsappService = require('./services/whatsappService'); // WhatsApp service disabled for now
 
 const app = express();
@@ -358,7 +359,7 @@ cron.schedule('5 9 * * *', async () => {
   }
 });
 
-app.listen(PORT, async () => {
+app.listen(PORT, () => {
   console.log(`\n🚀 RAJAC Finance System API Server`);
   console.log(`📍 Server running on port ${PORT}`);
   console.log(`🌐 API Base URL: http://localhost:${PORT}`);
@@ -385,15 +386,17 @@ app.listen(PORT, async () => {
   console.log(`   - Daily payment reminders: 10:00 AM`);
   console.log(`\n✅ Server is ready to accept requests\n`);
 
-  try {
-    console.log('Initializing Google Sheets...');
-    await googleSheets.initializeSpreadsheet();
+  // Initialize Google Sheets asynchronously
+  googleSheets.initializeSpreadsheet().then(() => {
     console.log('✅ Google Sheets initialized successfully\n');
-  } catch (error) {
+  }).catch((error) => {
     console.error('⚠️  Warning: Failed to initialize Google Sheets:', error.message);
     console.log('You can manually initialize by calling POST /api/init\n');
-  }
+  });
 });
+
+// Keep the process alive
+setInterval(() => {}, 1000);
 
 app.get('/api/students/search/:identifier', async (req, res) => {
   try {
@@ -720,5 +723,44 @@ app.get('/api/analytics/chat', async (req, res) => {
   } catch (error) {
     console.error('Error getting chat analytics:', error);
     res.status(500).json({ success: false, error: 'Failed to get chat analytics', message: error.message });
+  }
+});
+
+// Teachers API routes
+app.get('/api/teachers', async (req, res) => {
+  try {
+    const teachers = await teachersService.getAllTeachers();
+    res.json({ success: true, teachers });
+  } catch (error) {
+    console.error('Error getting teachers:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/teachers', async (req, res) => {
+  try {
+    const { name, subject, numberOfClasses, totalAmount } = req.body;
+    if (!name || !subject || !numberOfClasses || !totalAmount) {
+      return res.status(400).json({ success: false, error: 'All fields are required' });
+    }
+    const result = await teachersService.addTeacher({ name, subject, numberOfClasses: Number(numberOfClasses), totalAmount: Number(totalAmount) });
+    res.json(result);
+  } catch (error) {
+    console.error('Error adding teacher:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/teachers/payment', async (req, res) => {
+  try {
+    const { teacherName, amount, method } = req.body;
+    if (!teacherName || !amount || !method) {
+      return res.status(400).json({ success: false, error: 'All fields are required' });
+    }
+    const result = await teachersService.payTeacher({ teacherName, amount: Number(amount), method });
+    res.json(result);
+  } catch (error) {
+    console.error('Error paying teacher:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });

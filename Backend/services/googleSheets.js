@@ -48,6 +48,7 @@ class GoogleSheetsService {
         'Payments_Log',
         'In_Out_Transactions',
         'Bank_Deposits',
+        'Teachers',
         'Overdue_Payments',
           'Config',
           'Analytics'
@@ -61,6 +62,7 @@ class GoogleSheetsService {
       await this.initializePaymentsLogSheet();
       await this.initializeInOutSheet();
       await this.initializeBankDepositsSheet();
+      await this.initializeTeachersSheet();
       await this.initializeOverdueSheet();
       await this.initializeConfigSheet();
         await this.initializeAnalyticsSheet();
@@ -138,6 +140,15 @@ class GoogleSheetsService {
     ];
 
     await this.updateSheetHeaders('Bank_Deposits', headers);
+  }
+
+  async initializeTeachersSheet() {
+    const headers = [
+      'Teacher_ID', 'Name', 'Subject', 'Phone_Number', 
+      'Email', 'Hire_Date', 'Status'
+    ];
+
+    await this.updateSheetHeaders('Teachers', headers);
   }
 
   async initializeOverdueSheet() {
@@ -388,11 +399,106 @@ class GoogleSheetsService {
       const res = await this.drive.files.export({
         fileId: this.spreadsheetId,
         mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      }, { responseType: 'arraybuffer' });
-
-      return Buffer.from(res.data);
+      });
+      return res.data;
     } catch (error) {
       console.error('Error exporting master sheet:', error);
+      throw error;
+    }
+  }
+
+  // Teachers functions
+  async getTeachers() {
+    try {
+      const response = await this.sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: 'Teachers!A:G'
+      });
+      const rows = response.data.values || [];
+      if (rows.length === 0) return [];
+
+      const headers = rows[0];
+      return rows.slice(1).map(row => ({
+        id: row[0] || '',
+        name: row[1] || '',
+        subject: row[2] || '',
+        numberOfClasses: Number(row[3]) || 0,
+        totalAmount: Number(row[4]) || 0,
+        totalPaid: Number(row[5]) || 0,
+        remainingBalance: Number(row[6]) || 0,
+        createdAt: row[7] || ''
+      }));
+    } catch (error) {
+      console.error('Error fetching teachers:', error);
+      throw error;
+    }
+  }
+
+  async addTeacher(teacher) {
+    try {
+      const values = [[
+        teacher.id,
+        teacher.name,
+        teacher.subject,
+        teacher.numberOfClasses,
+        teacher.totalAmount,
+        teacher.totalPaid,
+        teacher.remainingBalance,
+        teacher.createdAt
+      ]];
+
+      await this.sheets.spreadsheets.values.append({
+        spreadsheetId: this.spreadsheetId,
+        range: 'Teachers!A:H',
+        valueInputOption: 'RAW',
+        resource: { values }
+      });
+    } catch (error) {
+      console.error('Error adding teacher:', error);
+      throw error;
+    }
+  }
+
+  async updateTeacherPayment(teacherId, totalPaid, remainingBalance) {
+    try {
+      const teachers = await this.getTeachers();
+      const rowIndex = teachers.findIndex(t => t.id === teacherId);
+      if (rowIndex === -1) throw new Error('Teacher not found');
+
+      const range = `Teachers!F${rowIndex + 2}:G${rowIndex + 2}`; // F is totalPaid, G is remainingBalance
+      const values = [[totalPaid, remainingBalance]];
+
+      await this.sheets.spreadsheets.values.update({
+        spreadsheetId: this.spreadsheetId,
+        range,
+        valueInputOption: 'RAW',
+        resource: { values }
+      });
+    } catch (error) {
+      console.error('Error updating teacher payment:', error);
+      throw error;
+    }
+  }
+
+  async addTransaction(transaction) {
+    try {
+      const values = [[
+        transaction.type,
+        transaction.teacherName || '',
+        transaction.amount,
+        transaction.method,
+        transaction.date,
+        transaction.description
+      ]];
+
+      await this.sheets.spreadsheets.values.append({
+        spreadsheetId: this.spreadsheetId,
+        range: 'In_Out_Transactions!A:F',
+        valueInputOption: 'RAW',
+        resource: { values }
+      });
+    } catch (error) {
+      console.error('Error adding transaction:', error);
       throw error;
     }
   }

@@ -165,11 +165,12 @@ class FinanceService {
 
   async getFinancialSummary() {
     try {
-      const [students, transactions, deposits, payments] = await Promise.all([
+      const [students, transactions, deposits, payments, teachers] = await Promise.all([
         googleSheets.getSheetData('Master_Students'),
         googleSheets.getSheetData('In_Out_Transactions'),
         googleSheets.getSheetData('Bank_Deposits'),
-        googleSheets.getSheetData('Payments_Log')
+        googleSheets.getSheetData('Payments_Log'),
+        googleSheets.getTeachers()
       ]);
 
       let totalCashInHand = 0;
@@ -320,6 +321,16 @@ class FinanceService {
       recent.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
       const recentItems = recent.slice(0, 20);
 
+      let totalTeachers = 0;
+      let totalTeacherPayments = 0;
+      let totalTeacherOutstanding = 0;
+
+      teachers.forEach(teacher => {
+        totalTeachers++;
+        totalTeacherPayments += teacher.totalPaid || 0;
+        totalTeacherOutstanding += teacher.remainingBalance || 0;
+      });
+
       return {
         cash: {
           totalCashInHand: Math.max(0, Math.round(totalCashInHand * 100) / 100),
@@ -339,10 +350,15 @@ class FinanceService {
             ? ((totalFeesCollected / totalFeesExpected) * 100).toFixed(2) + '%'
             : '0%'
         },
+        teachers: {
+          totalTeachers,
+          totalPayments: Math.round(totalTeacherPayments * 100) / 100,
+          totalOutstanding: Math.round(totalTeacherOutstanding * 100) / 100
+        },
         transactions: {
           totalIncome: Math.round((totalIncome + totalStudentPayments) * 100) / 100,
-          totalExpenses: Math.round(totalExpenses * 100) / 100,
-          netProfit: Math.round(((totalIncome + totalStudentPayments) - totalExpenses) * 100) / 100
+          totalExpenses: Math.round((totalExpenses + totalTeacherPayments) * 100) / 100, // Include teacher payments as expenses
+          netProfit: Math.round(((totalIncome + totalStudentPayments) - (totalExpenses + totalTeacherPayments)) * 100) / 100
         },
         monthly,
         recent: recentItems
