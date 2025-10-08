@@ -14,6 +14,10 @@ if (!BUILD_API_BASE) {
 }
 const API_BASE_URL = API_BASE.endsWith('/') ? API_BASE + 'api' : API_BASE + '/api';
 
+// Exported constant for other parts of the app that still use fetch directly.
+// This value already includes the trailing '/api' segment (e.g. https://.../api)
+export const API_CF = API_BASE_URL;
+
 interface ApiResponse<T = any> {
   ok: boolean;
   data?: T;
