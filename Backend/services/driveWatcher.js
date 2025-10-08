@@ -8,13 +8,45 @@ const googleSheets = require('./googleSheets');
 
 class DriveWatcher {
   constructor() {
-    this.auth = new google.auth.GoogleAuth({
-      credentials: {
-        client_email: process.env.GOOGLE_CLIENT_EMAIL,
-        private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n')
-      },
-      scopes: ['https://www.googleapis.com/auth/drive']
-    });
+    // Load credentials from a mounted secret file, an env JSON, or individual env vars.
+    let creds = null;
+    const secretPath = process.env.GOOGLE_SA_KEY_FILE || '/etc/secrets/google-sa-key.json';
+    try {
+      if (fs.existsSync(secretPath)) {
+        const raw = fs.readFileSync(secretPath, 'utf8');
+        creds = JSON.parse(raw);
+        console.log('Authenticating using service account key file.');
+      } else if (process.env.GOOGLE_SA_JSON) {
+        try {
+          creds = JSON.parse(process.env.GOOGLE_SA_JSON);
+          console.log('Authenticating using GOOGLE_SA_JSON env var.');
+        } catch (e) {
+          console.warn('Failed to parse GOOGLE_SA_JSON env var:', e.message || e);
+        }
+      } else if (process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
+        creds = {
+          client_email: process.env.GOOGLE_CLIENT_EMAIL,
+          private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n')
+        };
+        console.log('Authenticating using client email + private key env vars.');
+      } else {
+        console.warn('No Google service account credentials found in secret file or env vars; using Application Default Credentials if available.');
+      }
+    } catch (e) {
+      console.warn('Error while loading Google service account credentials:', e.message || e);
+    }
+
+    if (creds) {
+      this.auth = new google.auth.GoogleAuth({
+        credentials: creds,
+        scopes: ['https://www.googleapis.com/auth/drive']
+      });
+    } else {
+      // Fall back to ADC (e.g., Workload Identity, default service account) when no explicit creds provided
+      this.auth = new google.auth.GoogleAuth({
+        scopes: ['https://www.googleapis.com/auth/drive']
+      });
+    }
     this.drive = google.drive({ version: 'v3', auth: this.auth });
     this.uploadFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
     // archive mode: 'drive' (default) or 'sheet' (skip Drive archive, mark in sheet only)

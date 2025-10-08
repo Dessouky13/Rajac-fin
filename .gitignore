@@ -1,3 +1,9 @@
 Backend/service-account-key.json
 Backend/service-account-key.json
 .env
+# Ignore any json service account keys
+**/service-account*.json
+**/*-sa-*.json
+**/google-*-key*.json
+google-sa-key.json
+.vercel
