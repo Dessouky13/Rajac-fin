@@ -1,4 +1,5 @@
 const googleSheets = require('./googleSheets');
+const financeService = require('./financeService');
 
 class TeachersService {
   /**
@@ -57,17 +58,16 @@ class TeachersService {
 
       await googleSheets.updateTeacherPayment(teacher.id, newTotalPaid, newRemainingBalance);
 
-      // Add to transactions
-      const transaction = {
-        type: 'Teacher Payment',
-        teacherName: teacher.name,
-        amount: paymentAmount,
-        method: paymentData.method,
-        date: new Date().toISOString(),
-        description: `Payment to ${teacher.name} for ${teacher.subject}`
-      };
-
-      await googleSheets.addTransaction(transaction);
+      // Record the payment as an expense transaction (this will update cash/bank balances)
+      await financeService.recordTransaction(
+        'Expense', // Type: Expense (money going out)
+        paymentAmount, // Amount
+        'Teacher Salary', // Subject
+        teacher.name, // Payer/Receiver Name
+        paymentData.method, // Payment Method (Cash, Bank Transfer, etc.)
+        `Payment to ${teacher.name} for ${teacher.subject} - ${teacher.numberOfClasses} students`, // Notes
+        'Teacher Payment System' // Processed By
+      );
 
       return { success: true, teacher: { ...teacher, totalPaid: newTotalPaid, remainingBalance: newRemainingBalance } };
     } catch (error) {

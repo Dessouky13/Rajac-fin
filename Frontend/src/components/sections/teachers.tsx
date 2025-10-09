@@ -180,7 +180,7 @@ export function Teachers() {
               </div>
 
               <div>
-                <Label htmlFor="classes">{t("عدد الحصص", "Number of Classes")}</Label>
+                <Label htmlFor="classes">{t("عدد الطلاب", "Number of Students")}</Label>
                 <Input
                   id="classes"
                   type="number"
@@ -294,18 +294,18 @@ export function Teachers() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Hash className="h-4 w-4" />
-                    <span>{teacher.numberOfClasses} {t("حصة", "classes")}</span>
+                    <span>{teacher.numberOfClasses} {t("طالب", "students")}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4" />
-                    <span>{t("المجموع:", "Total:")} ${teacher.totalAmount}</span>
+                    <span>{t("المجموع:", "Total:")} £{teacher.totalAmount}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4" />
-                    <span>{t("مدفوع:", "Paid:")} ${teacher.totalPaid}</span>
+                    <span>{t("مدفوع:", "Paid:")} £{teacher.totalPaid}</span>
                   </div>
                   <Badge variant={teacher.remainingBalance > 0 ? "destructive" : "default"}>
-                    {t("متبقي:", "Remaining:")} ${teacher.remainingBalance}
+                    {t("متبقي:", "Remaining:")} £{teacher.remainingBalance}
                   </Badge>
                 </div>
               </Card>
