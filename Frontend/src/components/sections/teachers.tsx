@@ -143,7 +143,7 @@ export function Teachers() {
           {t("إدارة المعلمين", "Teachers Management")}
         </h1>
         <p className="text-muted-foreground">
-          {t("إدارة معلومات المعلمين والمواد الدراسية", "Manage teacher information and subjects")}
+          {t("", "Manage teacher information and subjects")}
         </p>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

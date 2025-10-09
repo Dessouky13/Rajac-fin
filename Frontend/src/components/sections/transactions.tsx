@@ -152,7 +152,7 @@ export function Transactions() {
             {t("المعاملات المالية", "Financial Transactions")}
           </h1>
           <p className="text-muted-foreground">
-            {t("إدارة الإيرادات والمصروفات", "Manage revenue and expenses")}
+            {t("", "Manage revenue and expenses")}
           </p>
         </div>
         <Button 

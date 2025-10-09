@@ -28,7 +28,7 @@ const navItems: NavItem[] = [
     labelAr: "إدارة الرسوم", 
     labelEn: "Fee Management",
     icon: CreditCard, 
-    descriptionAr: "البحث عن الطلاب وتسجيل المدفوعات",
+    descriptionAr: "",
     descriptionEn: "Search students and record payments"
   },
   { 
@@ -36,7 +36,7 @@ const navItems: NavItem[] = [
     labelAr: "تقرير المدفوعات المستحقة", 
     labelEn: "Due Payments Report",
     icon: Calendar, 
-    descriptionAr: "عرض الطلاب المتأخرين في السداد",
+    descriptionAr: "",
     descriptionEn: "View students with overdue payments"
   },
   { 
@@ -44,7 +44,7 @@ const navItems: NavItem[] = [
     labelAr: "الإيرادات والمصروفات", 
     labelEn: "Revenue & Expenses",
     icon: TrendingUp, 
-    descriptionAr: "المعاملات المالية",
+    descriptionAr: "",
     descriptionEn: "Financial transactions"
   },
   { 
@@ -52,7 +52,7 @@ const navItems: NavItem[] = [
     labelAr: "النقد والبنك والودائع", 
     labelEn: "Cash, Bank & Deposits",
     icon: PiggyBank, 
-    descriptionAr: "لوحة الأرصدة",
+    descriptionAr: "",
     descriptionEn: "Balance dashboard"
   },
   { 
@@ -60,7 +60,7 @@ const navItems: NavItem[] = [
     labelAr: "إدارة المعلمين", 
     labelEn: "Teachers Management",
     icon: GraduationCap, 
-    descriptionAr: "إدارة معلومات المعلمين والمواد الدراسية",
+    descriptionAr: "",
     descriptionEn: "Manage teacher information and subjects"
   },
 ];

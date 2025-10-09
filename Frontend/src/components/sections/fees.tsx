@@ -303,7 +303,7 @@ export function Fees() {
           {t("إدارة الرسوم", "Fee Management")}
         </h1>
         <p className="text-muted-foreground">
-          {t("البحث عن الطلاب وتسجيل المدفوعات", "Search students and record payments")}
+          {t("", "Search students and record payments")}
         </p>
       </div>
 

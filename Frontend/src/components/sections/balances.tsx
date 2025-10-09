@@ -160,7 +160,7 @@ export function Balances() {
             {t("لوحة الأرصدة", "Balance Dashboard")}
           </h1>
           <p className="text-muted-foreground">
-            {t("النقد والبنك والودائع والمدفوعات المتأخرة", "Cash, bank, deposits and overdue payments")}
+            {t("", "Cash, bank, deposits and overdue payments")}
           </p>
         </div>
         <Button 

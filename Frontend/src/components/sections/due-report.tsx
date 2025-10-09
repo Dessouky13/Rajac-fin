@@ -81,7 +81,7 @@ export function DueReport() {
           {t("تقرير المدفوعات المستحقة", "Due Payments Report")}
         </h1>
         <p className="text-muted-foreground">
-          {t("عرض الطلاب المتأخرين في السداد", "View students with overdue payments")}
+          {t("", "View students with overdue payments")}
         </p>
       </div>
 
