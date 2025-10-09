@@ -62,8 +62,8 @@ export function Teachers() {
       }
     } catch (error) {
       toast({
-        title: isArabic ? "خطأ" : "Error",
-        description: isArabic ? "فشل في تحميل المعلمين" : "Failed to load teachers",
+        title: t("خطأ", "Error"),
+        description: t("فشل في تحميل المعلمين", "Failed to load teachers"),
         variant: "destructive"
       });
     } finally {
@@ -83,8 +83,8 @@ export function Teachers() {
 
       if (response.ok) {
         toast({
-          title: isArabic ? "نجح" : "Success",
-          description: isArabic ? "تم إضافة المعلم بنجاح" : "Teacher added successfully"
+          title: t("نجح", "Success"),
+          description: t("تم إضافة المعلم بنجاح", "Teacher added successfully")
         });
         setNewTeacher({ name: "", subject: "", numberOfClasses: "", totalAmount: "" });
         await loadTeachers(); // Reload to show new teacher immediately
@@ -93,8 +93,8 @@ export function Teachers() {
       }
     } catch (error) {
       toast({
-        title: isArabic ? "خطأ" : "Error",
-        description: isArabic ? "فشل في إضافة المعلم" : "Failed to add teacher",
+        title: t("خطأ", "Error"),
+        description: t("فشل في إضافة المعلم", "Failed to add teacher"),
         variant: "destructive"
       });
     }
@@ -111,8 +111,8 @@ export function Teachers() {
 
       if (response.ok) {
         toast({
-          title: isArabic ? "نجح" : "Success",
-          description: isArabic ? "تم تسجيل الدفعة بنجاح" : "Payment recorded successfully"
+          title: t("نجح", "Success"),
+          description: t("تم تسجيل الدفعة بنجاح", "Payment recorded successfully")
         });
         setPayment({ teacherName: "", amount: "", method: "" });
         await loadTeachers(); // Reload to show updated payment status immediately
@@ -121,8 +121,8 @@ export function Teachers() {
       }
     } catch (error) {
       toast({
-        title: isArabic ? "خطأ" : "Error",
-        description: isArabic ? "فشل في تسجيل الدفعة" : "Failed to record payment",
+        title: t("خطأ", "Error"),
+        description: t("فشل في تسجيل الدفعة", "Failed to record payment"),
         variant: "destructive"
       });
     }
@@ -131,48 +131,56 @@ export function Teachers() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-lg">{isArabic ? "جاري التحميل..." : "Loading..."}</div>
+        <div className="text-lg">{t("جاري التحميل...", "Loading...")}</div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 fade-in" dir={isArabic ? "rtl" : "ltr"}>
+      <div>
+        <h1 className="text-3xl font-bold text-foreground">
+          {t("إدارة المعلمين", "Teachers Management")}
+        </h1>
+        <p className="text-muted-foreground">
+          {t("إدارة معلومات المعلمين والمواد الدراسية", "Manage teacher information and subjects")}
+        </p>
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Add Teacher Form */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
-              {isArabic ? "إضافة معلم جديد" : "Add New Teacher"}
+              {t("إضافة معلم جديد", "Add New Teacher")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleAddTeacher} className="space-y-4">
               <div>
-                <Label htmlFor="name">{isArabic ? "الاسم" : "Name"}</Label>
+                <Label htmlFor="name">{t("الاسم", "Name")}</Label>
                 <Input
                   id="name"
                   value={newTeacher.name}
                   onChange={(e) => setNewTeacher({ ...newTeacher, name: e.target.value })}
-                  placeholder={isArabic ? "أدخل اسم المعلم" : "Enter teacher name"}
+                  placeholder={t("أدخل اسم المعلم", "Enter teacher name")}
                   required
                 />
               </div>
 
               <div>
-                <Label htmlFor="subject">{isArabic ? "المادة" : "Subject"}</Label>
+                <Label htmlFor="subject">{t("المادة", "Subject")}</Label>
                 <Input
                   id="subject"
                   value={newTeacher.subject}
                   onChange={(e) => setNewTeacher({ ...newTeacher, subject: e.target.value })}
-                  placeholder={isArabic ? "أدخل المادة" : "Enter subject"}
+                  placeholder={t("أدخل المادة", "Enter subject")}
                   required
                 />
               </div>
 
               <div>
-                <Label htmlFor="classes">{isArabic ? "عدد الحصص" : "Number of Classes"}</Label>
+                <Label htmlFor="classes">{t("عدد الحصص", "Number of Classes")}</Label>
                 <Input
                   id="classes"
                   type="number"
@@ -184,7 +192,7 @@ export function Teachers() {
               </div>
 
               <div>
-                <Label htmlFor="amount">{isArabic ? "إجمالي المبلغ" : "Total Amount"}</Label>
+                <Label htmlFor="amount">{t("إجمالي المبلغ", "Total Amount")}</Label>
                 <Input
                   id="amount"
                   type="number"
@@ -198,7 +206,7 @@ export function Teachers() {
 
               <Button type="submit" className="w-full">
                 <Save className="h-4 w-4 mr-2" />
-                {isArabic ? "إضافة المعلم" : "Add Teacher"}
+                {t("إضافة المعلم", "Add Teacher")}
               </Button>
             </form>
           </CardContent>
@@ -209,16 +217,16 @@ export function Teachers() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CreditCard className="h-5 w-5" />
-              {isArabic ? "دفع للمعلم" : "Pay Teacher"}
+              {t("دفع للمعلم", "Pay Teacher")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handlePayTeacher} className="space-y-4">
               <div>
-                <Label htmlFor="teacher">{isArabic ? "المعلم" : "Teacher"}</Label>
+                <Label htmlFor="teacher">{t("المعلم", "Teacher")}</Label>
                 <Select value={payment.teacherName} onValueChange={(value) => setPayment({ ...payment, teacherName: value })}>
                   <SelectTrigger>
-                    <SelectValue placeholder={isArabic ? "اختر المعلم" : "Select teacher"} />
+                    <SelectValue placeholder={t("اختر المعلم", "Select teacher")} />
                   </SelectTrigger>
                   <SelectContent>
                     {teachers.map((teacher) => (
@@ -231,7 +239,7 @@ export function Teachers() {
               </div>
 
               <div>
-                <Label htmlFor="payAmount">{isArabic ? "المبلغ" : "Amount"}</Label>
+                <Label htmlFor="payAmount">{t("المبلغ", "Amount")}</Label>
                 <Input
                   id="payAmount"
                   type="number"
@@ -244,22 +252,22 @@ export function Teachers() {
               </div>
 
               <div>
-                <Label htmlFor="method">{isArabic ? "طريقة الدفع" : "Payment Method"}</Label>
+                <Label htmlFor="method">{t("طريقة الدفع", "Payment Method")}</Label>
                 <Select value={payment.method} onValueChange={(value) => setPayment({ ...payment, method: value })}>
                   <SelectTrigger>
-                    <SelectValue placeholder={isArabic ? "اختر طريقة الدفع" : "Select payment method"} />
+                    <SelectValue placeholder={t("اختر طريقة الدفع", "Select payment method")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Cash">{isArabic ? "نقدي" : "Cash"}</SelectItem>
-                    <SelectItem value="Bank Transfer">{isArabic ? "تحويل بنكي" : "Bank Transfer"}</SelectItem>
-                    <SelectItem value="Check">{isArabic ? "شيك" : "Check"}</SelectItem>
+                    <SelectItem value="Cash">{t("نقدي", "Cash")}</SelectItem>
+                    <SelectItem value="Bank Transfer">{t("تحويل بنكي", "Bank Transfer")}</SelectItem>
+                    <SelectItem value="Check">{t("شيك", "Check")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <Button type="submit" className="w-full">
                 <DollarSign className="h-4 w-4 mr-2" />
-                {isArabic ? "تسجيل الدفعة" : "Record Payment"}
+                {t("تسجيل الدفعة", "Record Payment")}
               </Button>
             </form>
           </CardContent>
@@ -269,7 +277,7 @@ export function Teachers() {
       {/* Teachers List */}
       <Card>
         <CardHeader>
-          <CardTitle>{isArabic ? "قائمة المعلمين" : "Teachers List"}</CardTitle>
+          <CardTitle>{t("قائمة المعلمين", "Teachers List")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -286,18 +294,18 @@ export function Teachers() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Hash className="h-4 w-4" />
-                    <span>{teacher.numberOfClasses} {isArabic ? "حصة" : "classes"}</span>
+                    <span>{teacher.numberOfClasses} {t("حصة", "classes")}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4" />
-                    <span>{isArabic ? "المجموع:" : "Total:"} ${teacher.totalAmount}</span>
+                    <span>{t("المجموع:", "Total:")} ${teacher.totalAmount}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4" />
-                    <span>{isArabic ? "مدفوع:" : "Paid:"} ${teacher.totalPaid}</span>
+                    <span>{t("مدفوع:", "Paid:")} ${teacher.totalPaid}</span>
                   </div>
                   <Badge variant={teacher.remainingBalance > 0 ? "destructive" : "default"}>
-                    {isArabic ? "متبقي:" : "Remaining:"} ${teacher.remainingBalance}
+                    {t("متبقي:", "Remaining:")} ${teacher.remainingBalance}
                   </Badge>
                 </div>
               </Card>
@@ -305,7 +313,7 @@ export function Teachers() {
           </div>
           {teachers.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
-              {isArabic ? "لا يوجد معلمون مسجلون" : "No teachers registered yet"}
+              {t("لا يوجد معلمون مسجلون", "No teachers registered yet")}
             </div>
           )}
         </CardContent>
