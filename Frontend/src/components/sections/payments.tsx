@@ -14,7 +14,7 @@ import {
   User,
   Receipt
 } from "lucide-react";
-import { getCashSummary, savePayment } from "@/lib/api";
+import { getCashSummary, savePayment, API_CF } from "@/lib/api";
 
 // Mock payment data
 const mockPayments = [
@@ -52,7 +52,7 @@ export function Payments() {
       if (!selectedGrade) return;
       try {
         // backend provides /api/students which returns all students; we filter by Year/Grade on frontend for simplicity
-        const res = await fetch('http://localhost:3000/api/students');
+        const res = await fetch(`${API_CF}/students`);
         const data = await res.json();
         const raw = data.students || [];
         const filtered = raw.filter((s: any) => {
