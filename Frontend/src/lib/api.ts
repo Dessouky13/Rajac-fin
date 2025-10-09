@@ -84,7 +84,7 @@ async function apiGet<T>(endpoint: string, params: Record<string, any> = {}): Pr
       headers: { 'Content-Type': 'application/json' },
     });
     const data = await response.json();
-    return { ok: data.success, ...data, data: data.students || data.student || data.data || data.analytics || data.transactions || data.installments || data.config || data.deposits };
+    return { ok: data.success, ...data, data: data.students || data.student || data.teachers || data.data || data.analytics || data.transactions || data.installments || data.config || data.deposits };
   } catch (error) {
     return { ok: false, data: null as T, message: error instanceof Error ? error.message : 'Unknown error' };
   }
