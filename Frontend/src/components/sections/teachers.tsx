@@ -21,8 +21,8 @@ interface Teacher {
   id: string;
   name: string;
   subject: string;
-  numberOfStudents: number;
-  feePerStudent: number;
+  numberOfStudents?: number;
+  feePerStudent?: number;
   totalAmount: number;
   totalPaid: number;
   remainingBalance: number;
@@ -145,8 +145,8 @@ export function Teachers() {
   const startEditTeacher = (teacher: Teacher) => {
     setEditingTeacher(teacher.id);
     setEditForm({
-      numberOfStudents: teacher.numberOfStudents.toString(),
-      feePerStudent: teacher.feePerStudent.toString()
+      numberOfStudents: (teacher.numberOfStudents || 0).toString(),
+      feePerStudent: (teacher.feePerStudent || Math.round(teacher.totalAmount / (teacher.numberOfStudents || 1))).toString()
     });
   };
 
@@ -401,6 +401,9 @@ export function Teachers() {
                         value={editForm.feePerStudent}
                         onChange={(e) => setEditForm({ ...editForm, feePerStudent: e.target.value })}
                       />
+                      <div className="text-sm text-muted-foreground bg-accent/10 p-2 rounded">
+                        {t("المجموع:", "Total:")} {(parseInt(editForm.numberOfStudents) || 0) * (parseFloat(editForm.feePerStudent) || 0)} EGP
+                      </div>
                       <div className="flex gap-2">
                         <Button size="sm" onClick={() => handleUpdateTeacher(teacher.id)}>
                           {t("حفظ", "Save")}
