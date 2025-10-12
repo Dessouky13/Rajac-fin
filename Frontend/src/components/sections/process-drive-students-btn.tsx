@@ -16,9 +16,17 @@ export function ProcessDriveStudentsButton() {
       });
       const data = await res.json();
       if (data.success) {
+        let message = `${data.filesProcessed} file(s) processed successfully.`;
+        
+        // If the response includes duplicate information, show it
+        if (data.duplicatesFound && data.duplicatesFound > 0) {
+          message += `\n• ${data.studentsAdded || 0} new students added`;
+          message += `\n• ${data.duplicatesFound} duplicates updated (fees & subjects only)`;
+        }
+
         toast({
           title: "Drive Import Complete",
-          description: `${data.filesProcessed} file(s) processed successfully.`,
+          description: message,
         });
       } else {
         toast({

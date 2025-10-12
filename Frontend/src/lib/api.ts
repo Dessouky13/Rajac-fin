@@ -360,9 +360,15 @@ export async function getTeachers(): Promise<ApiResponse<any[]>> {
 export async function addTeacher(teacher: {
   name: string;
   subject: string;
-  numberOfClasses: number;
+  numberOfStudents: number;
+  feePerStudent: number;
   totalAmount: number;
+  isUpdate?: boolean;
+  teacherId?: string;
 }): Promise<ApiResponse<any>> {
+  if (teacher.isUpdate && teacher.teacherId) {
+    return apiPost(`/teachers/${teacher.teacherId}/update`, teacher);
+  }
   return apiPost('/teachers', teacher);
 }
 

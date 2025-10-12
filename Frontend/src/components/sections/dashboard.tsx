@@ -47,9 +47,11 @@ export function Dashboard() {
   const totalStudents = analytics?.students?.totalStudents || 0;
   const monthlyRevenue = analytics?.transactions?.totalIncome || 0;
   const overduePayments = analytics?.overduePayments?.totalOverdue || 0;
-  const totalBalance = (analytics?.cash?.totalCashInHand || 0) + (analytics?.bank?.totalInBank || 0);
+  const totalBalance = analytics?.balance?.totalBalance || ((analytics?.cash?.totalCashInHand || 0) + (analytics?.bank?.totalInBank || 0));
   const cashBalance = analytics?.cash?.totalCashInHand || 0;
   const bankBalance = analytics?.bank?.totalInBank || 0;
+  const totalExpenses = analytics?.transactions?.totalExpenses || 0;
+  const netProfit = analytics?.transactions?.netProfit || 0;
 
   return (
     <div className="space-y-6 fade-in">
@@ -68,14 +70,70 @@ export function Dashboard() {
           className="slide-up"
         />
         <StatsCard
-          title="Monthly Revenue"
-          value={`$${monthlyRevenue.toLocaleString()}`}
+          title="Total Income"
+          value={`£${monthlyRevenue.toLocaleString()}`}
           icon={DollarSign}
           trend={{ value: 12, label: "vs last month" }}
           variant="success"
           className="slide-up"
         />
-        {/* Overdue Payments card intentionally removed from dashboard per request */}
+        <StatsCard
+          title="Total Expenses"
+          value={`£${totalExpenses.toLocaleString()}`}
+          icon={AlertTriangle}
+          trend={{ value: -5, label: "vs last month" }}
+          variant="warning"
+          className="slide-up"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <Card className="card-hover bg-gradient-card scale-in">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <TrendingUp className="h-5 w-5 text-success" />
+              <span>Net Profit</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center">
+              <span className={`text-2xl font-bold ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
+                £{netProfit.toLocaleString()}
+              </span>
+              <p className="text-xs text-muted-foreground mt-1">Total Income - Total Expenses</p>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="card-hover bg-gradient-card scale-in">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <DollarSign className="h-5 w-5 text-primary" />
+              <span>Cash Balance</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center">
+              <span className="text-2xl font-bold text-primary">£{cashBalance.toLocaleString()}</span>
+              <p className="text-xs text-muted-foreground mt-1">Available Cash</p>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="card-hover bg-gradient-card scale-in">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <CreditCard className="h-5 w-5 text-secondary" />
+              <span>Bank Balance</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center">
+              <span className="text-2xl font-bold text-secondary">£{bankBalance.toLocaleString()}</span>
+              <p className="text-xs text-muted-foreground mt-1">In Bank Account</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -90,17 +148,17 @@ export function Dashboard() {
             <div className="flex justify-between items-center p-4 bg-background/50 rounded-lg">
               <span className="text-sm font-medium">Total Balance</span>
               <span className="text-lg font-bold text-success">
-                ${totalBalance.toLocaleString()}
+                £{totalBalance.toLocaleString()}
               </span>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="text-center p-3 bg-accent/20 rounded-lg">
-                <p className="text-xs text-muted-foreground">Cash Balance</p>
-                <p className="text-lg font-semibold">${cashBalance.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Students Income</p>
+                <p className="text-lg font-semibold">£{(analytics?.students?.totalFeesCollected || 0).toLocaleString()}</p>
               </div>
               <div className="text-center p-3 bg-primary/10 rounded-lg">
-                <p className="text-xs text-muted-foreground">Bank Balance</p>
-                <p className="text-lg font-semibold">${bankBalance.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Teacher Expenses</p>
+                <p className="text-lg font-semibold">£{(analytics?.teachers?.totalPayments || 0).toLocaleString()}</p>
               </div>
             </div>
           </CardContent>

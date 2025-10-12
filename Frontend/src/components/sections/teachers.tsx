@@ -21,7 +21,8 @@ interface Teacher {
   id: string;
   name: string;
   subject: string;
-  numberOfClasses: number;
+  numberOfStudents: number;
+  feePerStudent: number;
   totalAmount: number;
   totalPaid: number;
   remainingBalance: number;
@@ -39,8 +40,8 @@ export function Teachers() {
   const [newTeacher, setNewTeacher] = useState({
     name: "",
     subject: "",
-    numberOfClasses: "",
-    totalAmount: ""
+    numberOfStudents: "",
+    feePerStudent: ""
   });
 
   // Pay teacher form
@@ -48,6 +49,13 @@ export function Teachers() {
     teacherName: "",
     amount: "",
     method: ""
+  });
+
+  // Edit teacher
+  const [editingTeacher, setEditingTeacher] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    numberOfStudents: "",
+    feePerStudent: ""
   });
 
   useEffect(() => {
@@ -73,12 +81,18 @@ export function Teachers() {
 
   const handleAddTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const numberOfStudents = parseInt(newTeacher.numberOfStudents);
+    const feePerStudent = parseFloat(newTeacher.feePerStudent);
+    const totalAmount = numberOfStudents * feePerStudent;
+    
     try {
       const response = await addTeacher({
         name: newTeacher.name,
         subject: newTeacher.subject,
-        numberOfClasses: parseInt(newTeacher.numberOfClasses),
-        totalAmount: parseFloat(newTeacher.totalAmount)
+        numberOfStudents: numberOfStudents,
+        feePerStudent: feePerStudent,
+        totalAmount: totalAmount
       });
 
       if (response.ok) {
@@ -86,7 +100,7 @@ export function Teachers() {
           title: t("نجح", "Success"),
           description: t("تم إضافة المعلم بنجاح", "Teacher added successfully")
         });
-        setNewTeacher({ name: "", subject: "", numberOfClasses: "", totalAmount: "" });
+        setNewTeacher({ name: "", subject: "", numberOfStudents: "", feePerStudent: "" });
         await loadTeachers(); // Reload to show new teacher immediately
       } else {
         throw new Error(response.message || "Failed to add teacher");
@@ -123,6 +137,54 @@ export function Teachers() {
       toast({
         title: t("خطأ", "Error"),
         description: t("فشل في تسجيل الدفعة", "Failed to record payment"),
+        variant: "destructive"
+      });
+    }
+  };
+
+  const startEditTeacher = (teacher: Teacher) => {
+    setEditingTeacher(teacher.id);
+    setEditForm({
+      numberOfStudents: teacher.numberOfStudents.toString(),
+      feePerStudent: teacher.feePerStudent.toString()
+    });
+  };
+
+  const handleUpdateTeacher = async (teacherId: string) => {
+    try {
+      const numberOfStudents = parseInt(editForm.numberOfStudents);
+      const feePerStudent = parseFloat(editForm.feePerStudent);
+      const newTotalAmount = numberOfStudents * feePerStudent;
+
+      // Find the teacher to get current payments
+      const teacher = teachers.find(t => t.id === teacherId);
+      if (!teacher) return;
+
+      const response = await addTeacher({
+        name: teacher.name,
+        subject: teacher.subject,
+        numberOfStudents: numberOfStudents,
+        feePerStudent: feePerStudent,
+        totalAmount: newTotalAmount,
+        isUpdate: true,
+        teacherId: teacherId
+      });
+
+      if (response.ok) {
+        toast({
+          title: t("نجح", "Success"),
+          description: t("تم تحديث بيانات المعلم", "Teacher information updated successfully")
+        });
+        setEditingTeacher(null);
+        setEditForm({ numberOfStudents: "", feePerStudent: "" });
+        await loadTeachers();
+      } else {
+        throw new Error(response.message || "Failed to update teacher");
+      }
+    } catch (error) {
+      toast({
+        title: t("خطأ", "Error"),
+        description: t("فشل في تحديث المعلم", "Failed to update teacher"),
         variant: "destructive"
       });
     }
@@ -180,29 +242,40 @@ export function Teachers() {
               </div>
 
               <div>
-                <Label htmlFor="classes">{t("عدد الطلاب", "Number of Students")}</Label>
+                <Label htmlFor="students">{t("عدد الطلاب", "Number of Students")}</Label>
                 <Input
-                  id="classes"
+                  id="students"
                   type="number"
-                  value={newTeacher.numberOfClasses}
-                  onChange={(e) => setNewTeacher({ ...newTeacher, numberOfClasses: e.target.value })}
+                  value={newTeacher.numberOfStudents}
+                  onChange={(e) => setNewTeacher({ ...newTeacher, numberOfStudents: e.target.value })}
                   placeholder="10"
                   required
                 />
               </div>
 
               <div>
-                <Label htmlFor="amount">{t("إجمالي المبلغ", "Total Amount")}</Label>
+                <Label htmlFor="feePerStudent">{t("رسوم لكل طالب", "Fee per Student")}</Label>
                 <Input
-                  id="amount"
+                  id="feePerStudent"
                   type="number"
                   step="0.01"
-                  value={newTeacher.totalAmount}
-                  onChange={(e) => setNewTeacher({ ...newTeacher, totalAmount: e.target.value })}
-                  placeholder="1000.00"
+                  value={newTeacher.feePerStudent}
+                  onChange={(e) => setNewTeacher({ ...newTeacher, feePerStudent: e.target.value })}
+                  placeholder="100.00"
                   required
                 />
               </div>
+
+              {newTeacher.numberOfStudents && newTeacher.feePerStudent && (
+                <div className="p-3 bg-primary/10 rounded-lg">
+                  <Label className="text-sm text-muted-foreground">
+                    {t("إجمالي المبلغ", "Total Amount")}
+                  </Label>
+                  <div className="text-lg font-semibold text-primary">
+                    £{(parseInt(newTeacher.numberOfStudents || "0") * parseFloat(newTeacher.feePerStudent || "0")).toLocaleString()}
+                  </div>
+                </div>
+              )}
 
               <Button type="submit" className="w-full">
                 <Save className="h-4 w-4 mr-2" />
@@ -294,7 +367,11 @@ export function Teachers() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Hash className="h-4 w-4" />
-                    <span>{teacher.numberOfClasses} {t("طالب", "students")}</span>
+                    <span>{teacher.numberOfStudents} {t("طالب", "students")}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    <span>{t("رسوم لكل طالب:", "Fee per student:")} £{teacher.feePerStudent || Math.round(teacher.totalAmount / (teacher.numberOfStudents || 1))}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4" />
@@ -307,6 +384,42 @@ export function Teachers() {
                   <Badge variant={teacher.remainingBalance > 0 ? "destructive" : "default"}>
                     {t("متبقي:", "Remaining:")} £{teacher.remainingBalance}
                   </Badge>
+                  
+                  {/* Edit Controls */}
+                  {editingTeacher === teacher.id ? (
+                    <div className="space-y-2 p-2 bg-accent/20 rounded">
+                      <Input
+                        type="number"
+                        placeholder={t("عدد الطلاب", "Number of Students")}
+                        value={editForm.numberOfStudents}
+                        onChange={(e) => setEditForm({ ...editForm, numberOfStudents: e.target.value })}
+                      />
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder={t("رسوم لكل طالب", "Fee per Student")}
+                        value={editForm.feePerStudent}
+                        onChange={(e) => setEditForm({ ...editForm, feePerStudent: e.target.value })}
+                      />
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={() => handleUpdateTeacher(teacher.id)}>
+                          {t("حفظ", "Save")}
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setEditingTeacher(null)}>
+                          {t("إلغاء", "Cancel")}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => startEditTeacher(teacher)}
+                      className="w-full mt-2"
+                    >
+                      {t("تعديل", "Edit")}
+                    </Button>
+                  )}
                 </div>
               </Card>
             ))}

@@ -234,9 +234,9 @@ export function Students() {
                     <div className="p-2 bg-primary/10 rounded-lg">
                       <GraduationCap className="h-5 w-5 text-primary" />
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-semibold text-foreground truncate">{student.name}</h3>
-                      <p className="text-sm text-muted-foreground truncate">{student.grade}</p>
+                    <div>
+                      <h3 className="font-semibold text-foreground">{student.name}</h3>
+                      <p className="text-sm text-muted-foreground">{student.grade}</p>
                     </div>
                   </div>
                   <Badge variant="default">Active</Badge>

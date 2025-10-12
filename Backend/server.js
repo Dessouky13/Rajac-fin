@@ -187,6 +187,44 @@ app.get('/api/payments/overdue', async (req, res) => {
   }
 });
 
+// API endpoint for n8n automation - returns overdue students with contact info
+app.get('/api/automation/overdue-payments', async (req, res) => {
+  try {
+    const overdueStudents = await paymentDueService.getOverdueStudents();
+    
+    // Format data for n8n automation with all necessary contact and payment info
+    const automationData = overdueStudents.map(student => ({
+      studentId: student.Student_ID || student.studentId,
+      name: student.Name || student.name,
+      year: student.Year || student.year,
+      phoneNumber: student.Phone_Number || student.phoneNumber,
+      dueDate: student.Due_Date || student.dueDate,
+      daysOverdue: parseInt(student.Days_Overdue || student.daysOverdue || 0),
+      installmentNumber: parseInt(student.Installment_Number || student.installmentNumber || 1),
+      amountDue: parseFloat(student.Amount_Due || student.amountDue || 0),
+      remainingBalance: parseFloat(student.Remaining_Balance || student.remainingBalance || 0),
+      totalPaid: parseFloat(student.Total_Paid || student.totalPaid || 0),
+      netAmount: parseFloat(student.Net_Amount || student.netAmount || 0),
+      lastUpdated: student.Last_Updated || student.lastUpdated || new Date().toISOString()
+    }));
+
+    res.json({
+      success: true,
+      message: 'Overdue payments data retrieved for automation',
+      totalOverdue: automationData.length,
+      retrievedAt: new Date().toISOString(),
+      data: automationData
+    });
+  } catch (error) {
+    console.error('Error retrieving overdue payments for automation:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve overdue payments for automation',
+      message: error.message
+    });
+  }
+});
+
 app.post('/api/payments/send-reminders', async (req, res) => {
   try {
     const { daysBeforeDue } = req.body;
@@ -204,6 +242,46 @@ app.post('/api/payments/send-reminders', async (req, res) => {
     console.error('Error sending reminders:', error);
     res.status(500).json({
       error: 'Failed to send reminders',
+      message: error.message
+    });
+  }
+});
+
+// API endpoint for n8n to log successful reminder deliveries
+app.post('/api/automation/log-reminder', async (req, res) => {
+  try {
+    const { 
+      studentId, 
+      reminderType, // 'whatsapp', 'sms', 'email'
+      status, // 'sent', 'delivered', 'failed'
+      message,
+      deliveredAt 
+    } = req.body;
+
+    // Validate required fields
+    if (!studentId || !reminderType || !status) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: studentId, reminderType, status'
+      });
+    }
+
+    // Log the reminder delivery (you can extend this to store in a sheet if needed)
+    console.log(`Reminder Log - Student: ${studentId}, Type: ${reminderType}, Status: ${status}, Time: ${deliveredAt || new Date().toISOString()}`);
+    
+    // Optional: Store in Google Sheets for tracking
+    // You could create a "Reminder_Log" sheet to track all reminder deliveries
+    
+    res.json({
+      success: true,
+      message: 'Reminder delivery logged successfully',
+      loggedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error logging reminder delivery:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to log reminder delivery',
       message: error.message
     });
   }
@@ -738,7 +816,7 @@ app.get('/api/analytics/chat', async (req, res) => {
 app.get('/api/teachers', async (req, res) => {
   try {
     const teachers = await teachersService.getAllTeachers();
-    res.json({ success: true, teachers });
+    res.json({ success: true, data: teachers });
   } catch (error) {
     console.error('Error getting teachers:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -747,14 +825,39 @@ app.get('/api/teachers', async (req, res) => {
 
 app.post('/api/teachers', async (req, res) => {
   try {
-    const { name, subject, numberOfClasses, totalAmount } = req.body;
-    if (!name || !subject || !numberOfClasses || !totalAmount) {
+    const { name, subject, numberOfStudents, feePerStudent, totalAmount } = req.body;
+    if (!name || !subject || !numberOfStudents || !feePerStudent || !totalAmount) {
       return res.status(400).json({ success: false, error: 'All fields are required' });
     }
-    const result = await teachersService.addTeacher({ name, subject, numberOfClasses: Number(numberOfClasses), totalAmount: Number(totalAmount) });
+    const result = await teachersService.addTeacher({ 
+      name, 
+      subject, 
+      numberOfStudents: Number(numberOfStudents), 
+      feePerStudent: Number(feePerStudent),
+      totalAmount: Number(totalAmount) 
+    });
     res.json(result);
   } catch (error) {
     console.error('Error adding teacher:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/teachers/:teacherId/update', async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+    const { numberOfStudents, feePerStudent, totalAmount } = req.body;
+    if (!numberOfStudents || !feePerStudent || !totalAmount) {
+      return res.status(400).json({ success: false, error: 'All fields are required' });
+    }
+    const result = await teachersService.updateTeacher(teacherId, { 
+      numberOfStudents: Number(numberOfStudents), 
+      feePerStudent: Number(feePerStudent),
+      totalAmount: Number(totalAmount) 
+    });
+    res.json(result);
+  } catch (error) {
+    console.error('Error updating teacher:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

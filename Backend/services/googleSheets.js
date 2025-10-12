@@ -248,6 +248,22 @@ class GoogleSheetsService {
     }
   }
 
+  async updateRowRange(sheetName, range, values) {
+    try {
+      await this.sheets.spreadsheets.values.update({
+        spreadsheetId: this.spreadsheetId,
+        range: range,
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: [values]
+        }
+      });
+    } catch (error) {
+      console.error(`Error updating row range in ${sheetName}:`, error);
+      throw error;
+    }
+  }
+
   async findStudentByIdOrName(identifier) {
     const data = await this.getSheetData('Master_Students');
     if (data.length <= 1) return null;
@@ -319,12 +335,13 @@ class GoogleSheetsService {
         'Payments_Log',
         'In_Out_Transactions',
         'Bank_Deposits',
-        'Overdue_Payments'
+        'Overdue_Payments',
+        'Teachers'
       ];
       for (const s of sheetsToClear) {
         await this.clearSheet(s);
       }
-      console.log('All data cleared');
+      console.log('All data cleared including Teachers');
     } catch (error) {
       console.error('Error clearing all data:', error);
       throw error;
@@ -412,7 +429,7 @@ class GoogleSheetsService {
     try {
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
-        range: 'Teachers!A:G'
+        range: 'Teachers!A:I'
       });
       const rows = response.data.values || [];
       if (rows.length === 0) return [];
@@ -422,11 +439,12 @@ class GoogleSheetsService {
         id: row[0] || '',
         name: row[1] || '',
         subject: row[2] || '',
-        numberOfClasses: Number(row[3]) || 0,
-        totalAmount: Number(row[4]) || 0,
-        totalPaid: Number(row[5]) || 0,
-        remainingBalance: Number(row[6]) || 0,
-        createdAt: row[7] || ''
+        numberOfStudents: Number(row[3]) || 0,
+        feePerStudent: Number(row[4]) || 0,
+        totalAmount: Number(row[5]) || 0,
+        totalPaid: Number(row[6]) || 0,
+        remainingBalance: Number(row[7]) || 0,
+        createdAt: row[8] || ''
       }));
     } catch (error) {
       console.error('Error fetching teachers:', error);
@@ -440,7 +458,8 @@ class GoogleSheetsService {
         teacher.id,
         teacher.name,
         teacher.subject,
-        teacher.numberOfClasses,
+        teacher.numberOfStudents,
+        teacher.feePerStudent,
         teacher.totalAmount,
         teacher.totalPaid,
         teacher.remainingBalance,
@@ -449,12 +468,43 @@ class GoogleSheetsService {
 
       await this.sheets.spreadsheets.values.append({
         spreadsheetId: this.spreadsheetId,
-        range: 'Teachers!A:H',
+        range: 'Teachers!A:I',
         valueInputOption: 'RAW',
         resource: { values }
       });
     } catch (error) {
       console.error('Error adding teacher:', error);
+      throw error;
+    }
+  }
+
+  async updateTeacher(teacherId, teacherData) {
+    try {
+      const teachers = await this.getTeachers();
+      const rowIndex = teachers.findIndex(t => t.id === teacherId);
+      if (rowIndex === -1) throw new Error('Teacher not found');
+
+      const range = `Teachers!A${rowIndex + 2}:I${rowIndex + 2}`;
+      const values = [[
+        teacherData.id,
+        teacherData.name,
+        teacherData.subject,
+        teacherData.numberOfStudents,
+        teacherData.feePerStudent,
+        teacherData.totalAmount,
+        teacherData.totalPaid,
+        teacherData.remainingBalance,
+        teacherData.createdAt
+      ]];
+
+      await this.sheets.spreadsheets.values.update({
+        spreadsheetId: this.spreadsheetId,
+        range,
+        valueInputOption: 'RAW',
+        resource: { values }
+      });
+    } catch (error) {
+      console.error('Error updating teacher:', error);
       throw error;
     }
   }
@@ -465,7 +515,7 @@ class GoogleSheetsService {
       const rowIndex = teachers.findIndex(t => t.id === teacherId);
       if (rowIndex === -1) throw new Error('Teacher not found');
 
-      const range = `Teachers!F${rowIndex + 2}:G${rowIndex + 2}`; // F is totalPaid, G is remainingBalance
+      const range = `Teachers!G${rowIndex + 2}:H${rowIndex + 2}`; // G is totalPaid, H is remainingBalance (updated for new structure)
       const values = [[totalPaid, remainingBalance]];
 
       await this.sheets.spreadsheets.values.update({

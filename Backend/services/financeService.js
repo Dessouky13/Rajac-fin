@@ -312,8 +312,9 @@ class FinanceService {
         const incomeFromTx = (transactionsByMonth[m] && transactionsByMonth[m].income) || 0;
         const expensesFromTx = (transactionsByMonth[m] && transactionsByMonth[m].expenses) || 0;
         const feesCollected = paymentsByMonth[m] || 0;
-        const depositsAmt = depositsByMonth[m] || 0;
-        const net = (incomeFromTx + feesCollected + depositsAmt) - expensesFromTx;
+        const depositsAmt = depositsByMonth[m] || 0; // Deposits are transfers, not income
+        // Net = (income from transactions + student fees) - expenses
+        const net = (incomeFromTx + feesCollected) - expensesFromTx;
         return { month: m, income: incomeFromTx, expenses: expensesFromTx, feesCollected, deposits: depositsAmt, net };
       });
 
@@ -331,6 +332,15 @@ class FinanceService {
         totalTeacherOutstanding += teacher.remainingBalance || 0;
       });
 
+      // Calculate total available balance (cash + bank)
+      const totalBalance = Math.round((totalCashInHand + totalInBank) * 100) / 100;
+      
+      // Calculate actual total income (student fees + other income, excluding deposits which are transfers)
+      const actualTotalIncome = Math.round((totalStudentPayments + totalIncome) * 100) / 100;
+      
+      // Calculate actual total expenses (other expenses + teacher payments)
+      const actualTotalExpenses = Math.round((totalExpenses + totalTeacherPayments) * 100) / 100;
+
       return {
         cash: {
           totalCashInHand: Math.max(0, Math.round(totalCashInHand * 100) / 100),
@@ -339,6 +349,10 @@ class FinanceService {
         bank: {
           totalInBank: Math.round(totalInBank * 100) / 100,
           description: 'Total amount deposited in bank'
+        },
+        balance: {
+          totalBalance: totalBalance,
+          description: 'Total available balance (cash + bank)'
         },
         students: {
           totalStudents,
@@ -356,9 +370,9 @@ class FinanceService {
           totalOutstanding: Math.round(totalTeacherOutstanding * 100) / 100
         },
         transactions: {
-          totalIncome: Math.round((totalIncome + totalStudentPayments) * 100) / 100,
-          totalExpenses: Math.round((totalExpenses + totalTeacherPayments) * 100) / 100, // Include teacher payments as expenses
-          netProfit: Math.round(((totalIncome + totalStudentPayments) - (totalExpenses + totalTeacherPayments)) * 100) / 100
+          totalIncome: actualTotalIncome, // Student fees + other income (excluding bank deposits)
+          totalExpenses: actualTotalExpenses, // Other expenses + teacher payments
+          netProfit: Math.round((actualTotalIncome - actualTotalExpenses) * 100) / 100
         },
         monthly,
         recent: recentItems

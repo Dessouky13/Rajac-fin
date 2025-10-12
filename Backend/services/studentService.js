@@ -40,8 +40,14 @@ class StudentService {
     });
 
     // reuse existing saver which creates master sheet rows and per-grade sheets
-    await this.saveStudentsToSheets(processed);
-    return { success: true, imported: processed.length };
+    const result = await this.saveStudentsToSheets(processed);
+    return { 
+      success: true, 
+      imported: result.totalProcessed,
+      studentsAdded: result.studentsAdded,
+      studentsUpdated: result.studentsUpdated,
+      duplicatesFound: result.duplicatesFound
+    };
   }
   async processUploadedFile(filePath, fileName) {
     try {
@@ -62,12 +68,15 @@ class StudentService {
         remainingBalance: parseFloat(student["Total_Fees"] || student["TOTAL Fees"] || student["Total Fees"] || student.Fees || student.Amount || student["Course Fees"] || student.Tuition || 0),
         status: 'Active'
       }));
-      await this.saveStudentsToSheets(processedStudents);
+      const result = await this.saveStudentsToSheets(processedStudents);
       const uploadedFile = await googleDrive.uploadFile(filePath, fileName);
       await googleDrive.archiveFile(uploadedFile.id);
       return {
         success: true,
-        studentsProcessed: processedStudents.length,
+        studentsProcessed: result.totalProcessed,
+        studentsAdded: result.studentsAdded,
+        studentsUpdated: result.studentsUpdated,
+        duplicatesFound: result.duplicatesFound,
         students: processedStudents
       };
     } catch (error) {
@@ -106,37 +115,134 @@ class StudentService {
   }
 
   async saveStudentsToSheets(students) {
-    // Ensure numeric financial fields are computed consistently before writing
-    const masterRows = students.map(s => {
-      const totalFees = Number(s.totalFees || 0) || 0;
-      const discountPercent = Number(s.discountPercent || 0) || 0;
-      const discountAmount = Number(s.discountAmount || (totalFees * discountPercent / 100)) || 0;
-      const netAmount = Number(s.netAmount || Math.round(totalFees - discountAmount)) || 0;
-      const totalPaid = Number(s.totalPaid || 0) || 0;
-      const remainingBalance = Number(s.remainingBalance || Math.round(netAmount - totalPaid)) || 0;
+    // Get existing students from Master_Students to check for duplicates
+    const existingStudentsData = await googleSheets.getSheetData('Master_Students');
+    const existingStudents = [];
+    
+    if (existingStudentsData.length > 1) {
+      const headers = existingStudentsData[0];
+      existingStudents.push(...existingStudentsData.slice(1).map(row => {
+        const student = {};
+        headers.forEach((header, index) => {
+          student[header] = row[index] || '';
+        });
+        return student;
+      }));
+    }
 
-      return [
+    const studentsToAdd = [];
+    const studentsToUpdate = [];
+    
+    // Process each student and check for duplicates
+    students.forEach(newStudent => {
+      const totalFees = Number(newStudent.totalFees || 0) || 0;
+      const discountPercent = Number(newStudent.discountPercent || 0) || 0;
+      const discountAmount = Number(newStudent.discountAmount || (totalFees * discountPercent / 100)) || 0;
+      const netAmount = Number(newStudent.netAmount || Math.round(totalFees - discountAmount)) || 0;
+      const totalPaid = Number(newStudent.totalPaid || 0) || 0;
+      const remainingBalance = Number(newStudent.remainingBalance || Math.round(netAmount - totalPaid)) || 0;
+
+      // Check for duplicate: same name and grade
+      const duplicate = existingStudents.find(existing => 
+        String(existing.Name || '').toLowerCase().trim() === String(newStudent.name || '').toLowerCase().trim() &&
+        String(existing.Year || '').toLowerCase().trim() === String(newStudent.year || '').toLowerCase().trim()
+      );
+
+      if (duplicate) {
+        // Update existing student: only totalFees, netAmount, numberOfSubjects
+        console.log(`Found duplicate student: ${newStudent.name} in ${newStudent.year}. Updating fees and subjects.`);
+        
+        // Keep existing payments and calculated fields, only update specified fields
+        const existingTotalPaid = Number(duplicate.Total_Paid || 0) || 0;
+        const newRemainingBalance = Math.max(0, netAmount - existingTotalPaid);
+        
+        studentsToUpdate.push({
+          studentId: duplicate.Student_ID,
+          name: duplicate.Name,
+          year: duplicate.Year,
+          numberOfSubjects: newStudent.numberOfSubjects, // Update
+          totalFees: totalFees, // Update
+          discountPercent: Number(duplicate.Discount_Percent || 0) || 0, // Keep existing
+          discountAmount: Number(duplicate.Discount_Amount || 0) || 0, // Keep existing
+          netAmount: netAmount, // Update
+          totalPaid: existingTotalPaid, // Keep existing
+          remainingBalance: newRemainingBalance, // Recalculate
+          phoneNumber: duplicate.Phone_Number || '', // Keep existing
+          enrollmentDate: duplicate.Enrollment_Date || '', // Keep existing
+          status: newRemainingBalance <= 0 ? 'Paid' : (duplicate.Status || 'Active'), // Update based on new balance
+          rowIndex: existingStudents.indexOf(duplicate) + 2 // +2 because sheet is 1-indexed and has header
+        });
+      } else {
+        // Add new student
+        console.log(`Adding new student: ${newStudent.name} in ${newStudent.year}`);
+        studentsToAdd.push({
+          studentId: newStudent.studentId,
+          name: newStudent.name,
+          year: newStudent.year,
+          numberOfSubjects: newStudent.numberOfSubjects,
+          totalFees,
+          discountPercent,
+          discountAmount,
+          netAmount,
+          totalPaid,
+          remainingBalance,
+          phoneNumber: newStudent.phoneNumber,
+          enrollmentDate: newStudent.enrollmentDate,
+          status: remainingBalance <= 0 ? 'Paid' : newStudent.status || 'Active'
+        });
+      }
+    });
+
+    // Update duplicate students
+    for (const student of studentsToUpdate) {
+      const updateRow = [
+        student.studentId,
+        student.name,
+        student.year,
+        student.numberOfSubjects,
+        student.totalFees,
+        student.discountPercent,
+        student.discountAmount,
+        student.netAmount,
+        student.totalPaid,
+        student.remainingBalance,
+        student.phoneNumber,
+        student.enrollmentDate,
+        student.status,
+        ''
+      ];
+      
+      const range = `Master_Students!A${student.rowIndex}:N${student.rowIndex}`;
+      await googleSheets.updateRowRange('Master_Students', range, updateRow);
+      console.log(`Updated duplicate student: ${student.name} in row ${student.rowIndex}`);
+    }
+
+    // Add new students
+    if (studentsToAdd.length > 0) {
+      const masterRows = studentsToAdd.map(s => [
         s.studentId,
         s.name,
         s.year,
         s.numberOfSubjects,
-        totalFees,
-        discountPercent,
-        discountAmount,
-        netAmount,
-        totalPaid,
-        remainingBalance,
+        s.totalFees,
+        s.discountPercent,
+        s.discountAmount,
+        s.netAmount,
+        s.totalPaid,
+        s.remainingBalance,
         s.phoneNumber,
         s.enrollmentDate,
-        remainingBalance <= 0 ? 'Paid' : s.status || 'Active',
+        s.status,
         ''
-      ];
-    });
+      ]);
 
-    console.log('DEBUG: About to append to Master_Students with rows:', JSON.stringify(masterRows, null, 2));
-    await googleSheets.appendRows('Master_Students', masterRows);
+      console.log(`Adding ${studentsToAdd.length} new students to Master_Students`);
+      await googleSheets.appendRows('Master_Students', masterRows);
+    }
 
-    const studentsByYear = students.reduce((acc, student) => {
+    // Process both new and updated students for grade sheets
+    const allProcessedStudents = [...studentsToAdd, ...studentsToUpdate];
+    const studentsByYear = allProcessedStudents.reduce((acc, student) => {
       const yearRaw = student.year;
       const year = yearRaw && String(yearRaw).trim() ? String(yearRaw).trim() : 'Unknown';
       if (!acc[year]) acc[year] = [];
@@ -183,7 +289,7 @@ class StudentService {
           await googleSheets.updateSheetHeaders(sheetName, headers);
         }
         await googleSheets.appendRows(sheetName, yearRows);
-        console.log(`DEBUG: Appended ${yearRows.length} rows to ${sheetName}`, JSON.stringify(yearRows, null, 2));
+        console.log(`Updated ${sheetName} with ${yearRows.length} students (new + updated)`);
       } catch (error) {
         console.error(`Error saving to ${sheetName}:`, error);
       }
@@ -201,6 +307,14 @@ class StudentService {
     } catch (err) {
       console.error('Warning: failed to sync grade sheets after saving students:', err && err.message ? err.message : err);
     }
+
+    // Return summary of what was processed
+    return {
+      studentsAdded: studentsToAdd.length,
+      studentsUpdated: studentsToUpdate.length,
+      duplicatesFound: studentsToUpdate.length,
+      totalProcessed: studentsToAdd.length + studentsToUpdate.length
+    };
   }
 
   async syncGradeSheetsFromMaster() {

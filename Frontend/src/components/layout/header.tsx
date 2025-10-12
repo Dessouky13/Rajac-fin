@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { ProcessDriveStudentsButton } from "@/components/sections/process-drive-students-btn";
+import { UploadStudentsButton } from "@/components/sections/upload-students-btn";
 import { Languages } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal } from "lucide-react";
@@ -75,6 +76,7 @@ export function Header() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <UploadStudentsButton />
           <ProcessDriveStudentsButton />
           <ThemeToggle />
         </div>

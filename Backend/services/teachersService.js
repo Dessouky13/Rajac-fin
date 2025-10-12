@@ -24,7 +24,8 @@ class TeachersService {
         id: this.generateId(),
         name: teacherData.name,
         subject: teacherData.subject,
-        numberOfClasses: teacherData.numberOfClasses,
+        numberOfStudents: teacherData.numberOfStudents,
+        feePerStudent: teacherData.feePerStudent,
         totalAmount: teacherData.totalAmount,
         totalPaid: 0,
         remainingBalance: teacherData.totalAmount,
@@ -35,6 +36,35 @@ class TeachersService {
       return { success: true, teacher };
     } catch (error) {
       console.error('Error adding teacher:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update teacher information
+   */
+  async updateTeacher(teacherId, updateData) {
+    try {
+      const teachers = await this.getAllTeachers();
+      const teacherIndex = teachers.findIndex(t => t.id === teacherId);
+      
+      if (teacherIndex === -1) {
+        throw new Error('Teacher not found');
+      }
+
+      const teacher = teachers[teacherIndex];
+      const updatedTeacher = {
+        ...teacher,
+        numberOfStudents: updateData.numberOfStudents,
+        feePerStudent: updateData.feePerStudent,
+        totalAmount: updateData.totalAmount,
+        remainingBalance: updateData.totalAmount - teacher.totalPaid
+      };
+
+      await googleSheets.updateTeacher(teacherId, updatedTeacher);
+      return { success: true, teacher: updatedTeacher };
+    } catch (error) {
+      console.error('Error updating teacher:', error);
       throw error;
     }
   }
