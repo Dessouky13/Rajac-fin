@@ -330,18 +330,35 @@ class GoogleSheetsService {
 
   async clearAllData() {
     try {
-      const sheetsToClear = [
-        'Master_Students',
-        'Payments_Log',
-        'In_Out_Transactions',
-        'Bank_Deposits',
-        'Overdue_Payments',
-        'Teachers'
-      ];
-      for (const s of sheetsToClear) {
-        await this.clearSheet(s);
+      // Get all sheet names from the spreadsheet
+      const spreadsheet = await this.sheets.spreadsheets.get({
+        spreadsheetId: this.spreadsheetId
+      });
+      
+      const allSheetNames = spreadsheet.data.sheets.map(sheet => sheet.properties.title);
+      console.log('Found sheets:', allSheetNames);
+      
+      // Sheets to preserve (don't clear)
+      const sheetsToPreserve = ['Analytics'];
+      
+      // Clear all sheets except Analytics
+      const sheetsToClear = allSheetNames.filter(name => 
+        !sheetsToPreserve.includes(name)
+      );
+      
+      console.log('Clearing sheets:', sheetsToClear);
+      
+      for (const sheetName of sheetsToClear) {
+        try {
+          await this.clearSheet(sheetName);
+          console.log(`Cleared sheet: ${sheetName}`);
+        } catch (error) {
+          console.error(`Failed to clear sheet ${sheetName}:`, error.message);
+          // Continue with other sheets even if one fails
+        }
       }
-      console.log('All data cleared including Teachers');
+      
+      console.log('All data cleared successfully (preserving Analytics)');
     } catch (error) {
       console.error('Error clearing all data:', error);
       throw error;
@@ -403,9 +420,117 @@ class GoogleSheetsService {
       if (rowsToAppend.length > 0) {
         await this.appendRows('Analytics', rowsToAppend);
       }
+
+      // Check if we need to create a monthly backup
+      await this.checkAndCreateMonthlyBackup(headerRows.slice(1).concat(monthlyRows).concat(recentRows));
     } catch (error) {
       console.error('Error writing analytics:', error);
       throw error;
+    }
+  }
+
+  async checkAndCreateMonthlyBackup(analyticsData) {
+    try {
+      const now = moment();
+      const currentMonth = now.format('YYYY-MM');
+      const backupSheetName = `Analytics_Backup_${currentMonth}`;
+      
+      // Check if backup sheet for this month already exists
+      const spreadsheet = await this.sheets.spreadsheets.get({
+        spreadsheetId: this.spreadsheetId
+      });
+      
+      const existingSheets = spreadsheet.data.sheets.map(sheet => sheet.properties.title);
+      
+      if (!existingSheets.includes(backupSheetName)) {
+        console.log(`Creating monthly backup sheet: ${backupSheetName}`);
+        
+        // Create new sheet for backup
+        await this.sheets.spreadsheets.batchUpdate({
+          spreadsheetId: this.spreadsheetId,
+          resource: {
+            requests: [{
+              addSheet: {
+                properties: {
+                  title: backupSheetName,
+                  index: existingSheets.length // Add at the end
+                }
+              }
+            }]
+          }
+        });
+        
+        // Copy analytics data to backup sheet
+        const backupData = [
+          ['Metric', 'Value', 'Details', 'Backup_Created'],
+          ...analyticsData.map(row => [...row.slice(0, 3), now.format('YYYY-MM-DD HH:mm:ss')])
+        ];
+        
+        await this.sheets.spreadsheets.values.update({
+          spreadsheetId: this.spreadsheetId,
+          range: `${backupSheetName}!A1:D${backupData.length}`,
+          valueInputOption: 'RAW',
+          resource: { values: backupData }
+        });
+        
+        console.log(`Monthly backup created successfully: ${backupSheetName}`);
+        
+        // Clean up old backup sheets (older than 6 months)
+        await this.cleanupOldBackups();
+      } else {
+        console.log(`Monthly backup already exists: ${backupSheetName}`);
+      }
+    } catch (error) {
+      console.error('Error creating monthly backup:', error);
+      // Don't throw error - backup failure shouldn't stop analytics writing
+    }
+  }
+
+  async cleanupOldBackups() {
+    try {
+      const cutoffDate = moment().subtract(6, 'months');
+      const cutoffMonth = cutoffDate.format('YYYY-MM');
+      
+      const spreadsheet = await this.sheets.spreadsheets.get({
+        spreadsheetId: this.spreadsheetId
+      });
+      
+      const sheetsToDelete = [];
+      
+      spreadsheet.data.sheets.forEach(sheet => {
+        const sheetName = sheet.properties.title;
+        if (sheetName.startsWith('Analytics_Backup_')) {
+          const monthPart = sheetName.replace('Analytics_Backup_', '');
+          if (monthPart < cutoffMonth) {
+            sheetsToDelete.push({
+              sheetId: sheet.properties.sheetId,
+              title: sheetName
+            });
+          }
+        }
+      });
+      
+      if (sheetsToDelete.length > 0) {
+        console.log(`Deleting ${sheetsToDelete.length} old backup sheets:`, sheetsToDelete.map(s => s.title));
+        
+        const deleteRequests = sheetsToDelete.map(sheet => ({
+          deleteSheet: {
+            sheetId: sheet.sheetId
+          }
+        }));
+        
+        await this.sheets.spreadsheets.batchUpdate({
+          spreadsheetId: this.spreadsheetId,
+          resource: {
+            requests: deleteRequests
+          }
+        });
+        
+        console.log('Old backup sheets deleted successfully');
+      }
+    } catch (error) {
+      console.error('Error cleaning up old backups:', error);
+      // Don't throw error - cleanup failure shouldn't stop the main process
     }
   }
 

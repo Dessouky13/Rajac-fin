@@ -755,6 +755,23 @@ app.post('/api/admin/delete-all', async (req, res) => {
   }
 });
 
+app.post('/api/admin/backup-analytics', async (req, res) => {
+  try {
+    // Get current analytics data
+    const analyticsData = await googleSheets.getSheetData('Analytics');
+    if (analyticsData.length > 1) {
+      // Remove header row and trigger backup
+      await googleSheets.checkAndCreateMonthlyBackup(analyticsData.slice(1));
+      return res.json({ success: true, message: 'Analytics backup created successfully' });
+    } else {
+      return res.json({ success: true, message: 'No analytics data to backup' });
+    }
+  } catch (error) {
+    console.error('Error creating analytics backup:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 app.post('/api/admin/installments', async (req, res) => {
   try {
     const { installments } = req.body;
@@ -825,13 +842,29 @@ app.get('/api/teachers', async (req, res) => {
 
 app.post('/api/teachers', async (req, res) => {
   try {
+    console.log('Received teacher data:', req.body);
     const { name, subject, numberOfStudents, feePerStudent, totalAmount } = req.body;
-    if (!name || !subject || !numberOfStudents || !feePerStudent || !totalAmount) {
-      return res.status(400).json({ success: false, error: 'All fields are required' });
+    
+    // More explicit validation
+    if (!name || !subject) {
+      return res.status(400).json({ success: false, error: 'Name and subject are required' });
     }
+    
+    if (numberOfStudents === undefined || numberOfStudents === null || isNaN(numberOfStudents)) {
+      return res.status(400).json({ success: false, error: 'Valid number of students is required' });
+    }
+    
+    if (feePerStudent === undefined || feePerStudent === null || isNaN(feePerStudent)) {
+      return res.status(400).json({ success: false, error: 'Valid fee per student is required' });
+    }
+    
+    if (totalAmount === undefined || totalAmount === null || isNaN(totalAmount)) {
+      return res.status(400).json({ success: false, error: 'Valid total amount is required' });
+    }
+    
     const result = await teachersService.addTeacher({ 
-      name, 
-      subject, 
+      name: name.trim(), 
+      subject: subject.trim(), 
       numberOfStudents: Number(numberOfStudents), 
       feePerStudent: Number(feePerStudent),
       totalAmount: Number(totalAmount) 
@@ -845,11 +878,22 @@ app.post('/api/teachers', async (req, res) => {
 
 app.post('/api/teachers/:teacherId/update', async (req, res) => {
   try {
+    console.log('Received teacher update data:', req.body);
     const { teacherId } = req.params;
     const { numberOfStudents, feePerStudent, totalAmount } = req.body;
-    if (!numberOfStudents || !feePerStudent || !totalAmount) {
-      return res.status(400).json({ success: false, error: 'All fields are required' });
+    
+    if (numberOfStudents === undefined || numberOfStudents === null || isNaN(numberOfStudents)) {
+      return res.status(400).json({ success: false, error: 'Valid number of students is required' });
     }
+    
+    if (feePerStudent === undefined || feePerStudent === null || isNaN(feePerStudent)) {
+      return res.status(400).json({ success: false, error: 'Valid fee per student is required' });
+    }
+    
+    if (totalAmount === undefined || totalAmount === null || isNaN(totalAmount)) {
+      return res.status(400).json({ success: false, error: 'Valid total amount is required' });
+    }
+    
     const result = await teachersService.updateTeacher(teacherId, { 
       numberOfStudents: Number(numberOfStudents), 
       feePerStudent: Number(feePerStudent),
