@@ -173,11 +173,13 @@ class FinanceService {
         googleSheets.getTeachers()
       ]);
 
-      let totalCashInHand = 0;
-      let totalInBank = 0;
-      let totalStudentPayments = 0;
-      let totalExpenses = 0;
-      let totalIncome = 0;
+  let totalCashInHand = 0;
+  let totalInBank = 0;
+  let totalStudentPayments = 0;
+  let totalExpenses = 0;
+  let totalIncome = 0;
+
+  const normalize = (value) => String(value || '').trim().toLowerCase();
 
       // For richer analytics
       const paymentsByMonth = {};
@@ -193,27 +195,28 @@ class FinanceService {
 
         // Treat Payments_Log as the canonical record of student payments.
         // Bank_Deposits represent transfers (usually cash->bank) and other bank movements.
-        const isCashMethod = (m) => String(m || '').toLowerCase() === 'cash';
+        const isCashMethod = (m) => normalize(m) === 'cash';
 
         payments.slice(1).forEach(row => {
           const amount = parseFloat(row[amountIndex] || 0) || 0;
-          const method = row[methodIndex] || '';
+          const methodRaw = row[methodIndex] || '';
+          const method = normalize(methodRaw);
           const dateStr = row[dateIndex] || '';
           totalStudentPayments += amount;
 
           if (isCashMethod(method)) {
             totalCashInHand += amount;
           } else {
-            // For non-cash student payments we'll consider the payment recorded here but
-            // only count bank increase when there is an explicit Bank_Deposits record.
-            // So do not add to totalInBank here to avoid double-counting.
+            // Non-cash student payments (Visa, Instapay, etc.) go directly to bank
+            // We should count them toward totalInBank since they don't create separate bank deposit records
+            totalInBank += amount;
           }
 
           // monthly aggregation
           const month = require('moment')(dateStr || undefined).format('YYYY-MM');
           paymentsByMonth[month] = (paymentsByMonth[month] || 0) + amount;
 
-          recent.push({ kind: 'payment', date: dateStr, amount, method, raw: row });
+          recent.push({ kind: 'payment', date: dateStr, amount, method: methodRaw, raw: row });
         });
       }
 
@@ -225,12 +228,17 @@ class FinanceService {
         const dateIndex = txnHeaders.indexOf('Date');
 
         transactions.slice(1).forEach(row => {
-          const type = (row[typeIndex] || '').toString().toLowerCase();
+          const typeRaw = row[typeIndex] || '';
+          const typeNormalized = normalize(typeRaw);
+          const type = typeNormalized.includes('expense') || typeNormalized.startsWith('out')
+            ? 'expense'
+            : (typeNormalized.includes('income') || typeNormalized.startsWith('in') ? 'income' : typeNormalized);
           const amount = parseFloat(row[amountIndex] || 0) || 0;
-          const method = row[methodIndex] || '';
+          const methodRaw = row[methodIndex] || '';
+          const method = normalize(methodRaw);
           const dateStr = row[dateIndex] || '';
 
-          const isCash = String(method || '').toLowerCase() === 'cash';
+          const isCash = method === 'cash';
 
           if (type === 'in' || type === 'income') {
             totalIncome += amount;
@@ -253,7 +261,7 @@ class FinanceService {
           if (type === 'in' || type === 'income') transactionsByMonth[month].income += amount;
           if (type === 'out' || type === 'expense') transactionsByMonth[month].expenses += amount;
 
-          recent.push({ kind: 'transaction', date: dateStr, type, amount, method, raw: row });
+          recent.push({ kind: 'transaction', date: dateStr, type: typeRaw, amount, method: methodRaw, raw: row });
         });
       }
 
@@ -379,6 +387,117 @@ class FinanceService {
       };
     } catch (error) {
       console.error('Error getting financial summary:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Clean up duplicate bank deposits created by electronic student payments
+   * This should be run once to fix the double-counting issue
+   */
+  async cleanupDuplicateBankDeposits() {
+    try {
+      console.log('Starting cleanup of duplicate bank deposits...');
+      
+      // Get all bank deposits
+      const deposits = await googleSheets.getSheetData('Bank_Deposits');
+      if (deposits.length <= 1) {
+        console.log('No bank deposits found');
+        return { success: true, message: 'No deposits to clean up', removed: 0 };
+      }
+
+      // Get all student payments
+      const payments = await googleSheets.getSheetData('Payments_Log');
+      if (payments.length <= 1) {
+        console.log('No student payments found');
+        return { success: true, message: 'No payments to check against', removed: 0 };
+      }
+
+      const paymentHeaders = payments[0];
+      const paymentDateIndex = paymentHeaders.indexOf('Payment_Date');
+      const paymentAmountIndex = paymentHeaders.indexOf('Amount_Paid');
+      const paymentMethodIndex = paymentHeaders.indexOf('Payment_Method');
+      const paymentStudentIndex = paymentHeaders.indexOf('Student_ID');
+
+      const depositHeaders = deposits[0];
+      const depositDateIndex = depositHeaders.indexOf('Date');
+      const depositAmountIndex = depositHeaders.indexOf('Amount');
+      const depositNotesIndex = depositHeaders.indexOf('Notes');
+
+      let duplicatesFound = [];
+
+      // Check each bank deposit to see if it matches a student payment
+      for (let i = 1; i < deposits.length; i++) {
+        const depositRow = deposits[i];
+        const depositAmount = parseFloat(depositRow[depositAmountIndex] || 0);
+        const depositNotes = depositRow[depositNotesIndex] || '';
+        const depositDate = depositRow[depositDateIndex] || '';
+
+        // Check if this looks like an auto-generated student payment deposit
+        if (depositNotes.includes('Auto: student payment')) {
+          const studentId = depositNotes.match(/Auto: student payment (\w+)/)?.[1];
+          
+          // Look for matching payment
+          const matchingPayment = payments.slice(1).find(paymentRow => {
+            const paymentAmount = parseFloat(paymentRow[paymentAmountIndex] || 0);
+            const paymentStudent = paymentRow[paymentStudentIndex];
+            const paymentMethod = paymentRow[paymentMethodIndex];
+            const paymentDate = paymentRow[paymentDateIndex];
+            
+            return (
+              Math.abs(paymentAmount - depositAmount) < 0.01 && // Same amount
+              paymentStudent === studentId && // Same student
+              paymentMethod !== 'Cash' && // Non-cash payment
+              Math.abs(new Date(paymentDate) - new Date(depositDate)) < 86400000 // Within 24 hours
+            );
+          });
+
+          if (matchingPayment) {
+            duplicatesFound.push({
+              rowIndex: i + 1, // Google Sheets is 1-indexed
+              amount: depositAmount,
+              studentId: studentId,
+              notes: depositNotes
+            });
+          }
+        }
+      }
+
+      console.log(`Found ${duplicatesFound.length} duplicate bank deposits to remove`);
+
+      if (duplicatesFound.length > 0) {
+        // Remove duplicates by clearing their rows (we'll keep the structure)
+        const rangesToClear = duplicatesFound.map(dup => `Bank_Deposits!A${dup.rowIndex}:F${dup.rowIndex}`);
+        
+        for (const range of rangesToClear) {
+          await googleSheets.sheets.spreadsheets.values.clear({
+            spreadsheetId: googleSheets.spreadsheetId,
+            range: range
+          });
+        }
+
+        console.log(`Removed ${duplicatesFound.length} duplicate bank deposits`);
+        
+        // Calculate total amount corrected
+        const totalCorrected = duplicatesFound.reduce((sum, dup) => sum + dup.amount, 0);
+        
+        return {
+          success: true,
+          message: `Cleaned up ${duplicatesFound.length} duplicate bank deposits`,
+          removed: duplicatesFound.length,
+          totalAmountCorrected: totalCorrected,
+          duplicatesRemoved: duplicatesFound
+        };
+      }
+
+      return {
+        success: true,
+        message: 'No duplicate bank deposits found',
+        removed: 0
+      };
+
+    } catch (error) {
+      console.error('Error cleaning up duplicate bank deposits:', error);
       throw error;
     }
   }
