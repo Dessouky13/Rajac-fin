@@ -190,6 +190,15 @@ class FinanceService {
   const depositsByDay = {};
       const recent = [];
 
+  let cashFromStudentPayments = 0;
+  let bankFromStudentPayments = 0;
+  let cashIncomeTransactions = 0;
+  let bankIncomeTransactions = 0;
+  let cashExpenseTransactions = 0;
+  let bankExpenseTransactions = 0;
+  let depositsIntoBank = 0;
+  let withdrawalsFromBank = 0;
+
       if (payments.length > 1) {
         const paymentHeaders = payments[0];
         const amountIndex = paymentHeaders.indexOf('Amount_Paid');
@@ -208,11 +217,9 @@ class FinanceService {
           totalStudentPayments += amount;
 
           if (isCashMethod(method)) {
-            totalCashInHand += amount;
+            cashFromStudentPayments += amount;
           } else {
-            // Non-cash student payments (Visa, Instapay, etc.) go directly to bank
-            // We should count them toward totalInBank since they don't create separate bank deposit records
-            totalInBank += amount;
+            bankFromStudentPayments += amount;
           }
 
           // monthly aggregation
@@ -249,16 +256,16 @@ class FinanceService {
           if (type === 'in' || type === 'income') {
             totalIncome += amount;
             if (isCash) {
-              totalCashInHand += amount;
+              cashIncomeTransactions += amount;
             } else {
-              totalInBank += amount;
+              bankIncomeTransactions += amount;
             }
           } else if (type === 'out' || type === 'expense') {
             totalExpenses += amount;
             if (isCash) {
-              totalCashInHand -= amount;
+              cashExpenseTransactions += amount;
             } else {
-              totalInBank -= amount;
+              bankExpenseTransactions += amount;
             }
           }
 
@@ -288,9 +295,12 @@ class FinanceService {
         deposits.slice(1).forEach(row => {
           const amount = parseFloat(row[amountIndex] || 0) || 0;
           const dateStr = row[dateIndex] || '';
-          // Bank deposits move cash into bank (typically cash collected deposited into bank)
-          totalInBank += amount;
-          totalCashInHand -= amount;
+          if (amount >= 0) {
+            depositsIntoBank += amount;
+          } else {
+            // Negative amount represents withdrawal from bank back to cash
+            withdrawalsFromBank += Math.abs(amount);
+          }
 
           const depositMoment = moment(dateStr || undefined);
           const month = depositMoment.isValid() ? depositMoment.format('YYYY-MM') : 'Unknown';
@@ -301,6 +311,20 @@ class FinanceService {
           recent.push({ kind: 'deposit', date: dateStr, amount, raw: row });
         });
       }
+
+      totalCashInHand =
+        cashFromStudentPayments +
+        cashIncomeTransactions -
+        cashExpenseTransactions -
+        depositsIntoBank +
+        withdrawalsFromBank;
+
+      totalInBank =
+        bankFromStudentPayments +
+        bankIncomeTransactions -
+        bankExpenseTransactions +
+        depositsIntoBank -
+        withdrawalsFromBank;
 
       let totalStudents = 0;
       let activeStudents = 0;
@@ -389,7 +413,7 @@ class FinanceService {
 
       return {
         cash: {
-          totalCashInHand: Math.max(0, Math.round(totalCashInHand * 100) / 100),
+          totalCashInHand: Math.round(totalCashInHand * 100) / 100,
           description: 'Current cash available'
         },
         bank: {
