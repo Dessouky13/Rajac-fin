@@ -182,9 +182,12 @@ class FinanceService {
   const normalize = (value) => String(value || '').trim().toLowerCase();
 
       // For richer analytics
-      const paymentsByMonth = {};
-      const transactionsByMonth = {};
-      const depositsByMonth = {};
+  const paymentsByMonth = {};
+  const paymentsByDay = {};
+  const transactionsByMonth = {};
+  const transactionsByDay = {};
+  const depositsByMonth = {};
+  const depositsByDay = {};
       const recent = [];
 
       if (payments.length > 1) {
@@ -213,8 +216,11 @@ class FinanceService {
           }
 
           // monthly aggregation
-          const month = require('moment')(dateStr || undefined).format('YYYY-MM');
+          const paymentMoment = moment(dateStr || undefined);
+          const month = paymentMoment.isValid() ? paymentMoment.format('YYYY-MM') : 'Unknown';
+          const day = paymentMoment.isValid() ? paymentMoment.format('YYYY-MM-DD') : 'Unknown';
           paymentsByMonth[month] = (paymentsByMonth[month] || 0) + amount;
+          paymentsByDay[day] = (paymentsByDay[day] || 0) + amount;
 
           recent.push({ kind: 'payment', date: dateStr, amount, method: methodRaw, raw: row });
         });
@@ -256,10 +262,19 @@ class FinanceService {
             }
           }
 
-          const month = require('moment')(dateStr || undefined).format('YYYY-MM');
+          const txnMoment = moment(dateStr || undefined);
+          const month = txnMoment.isValid() ? txnMoment.format('YYYY-MM') : 'Unknown';
+          const day = txnMoment.isValid() ? txnMoment.format('YYYY-MM-DD') : 'Unknown';
           transactionsByMonth[month] = transactionsByMonth[month] || { income: 0, expenses: 0 };
-          if (type === 'in' || type === 'income') transactionsByMonth[month].income += amount;
-          if (type === 'out' || type === 'expense') transactionsByMonth[month].expenses += amount;
+          transactionsByDay[day] = transactionsByDay[day] || { income: 0, expenses: 0 };
+          if (type === 'in' || type === 'income') {
+            transactionsByMonth[month].income += amount;
+            transactionsByDay[day].income += amount;
+          }
+          if (type === 'out' || type === 'expense') {
+            transactionsByMonth[month].expenses += amount;
+            transactionsByDay[day].expenses += amount;
+          }
 
           recent.push({ kind: 'transaction', date: dateStr, type: typeRaw, amount, method: methodRaw, raw: row });
         });
@@ -277,8 +292,11 @@ class FinanceService {
           totalInBank += amount;
           totalCashInHand -= amount;
 
-          const month = require('moment')(dateStr || undefined).format('YYYY-MM');
+          const depositMoment = moment(dateStr || undefined);
+          const month = depositMoment.isValid() ? depositMoment.format('YYYY-MM') : 'Unknown';
+          const day = depositMoment.isValid() ? depositMoment.format('YYYY-MM-DD') : 'Unknown';
           depositsByMonth[month] = (depositsByMonth[month] || 0) + amount;
+          depositsByDay[day] = (depositsByDay[day] || 0) + amount;
 
           recent.push({ kind: 'deposit', date: dateStr, amount, raw: row });
         });
@@ -324,6 +342,26 @@ class FinanceService {
         // Net = (income from transactions + student fees) - expenses
         const net = (incomeFromTx + feesCollected) - expensesFromTx;
         return { month: m, income: incomeFromTx, expenses: expensesFromTx, feesCollected, deposits: depositsAmt, net };
+      });
+
+      const daysSet = new Set([
+        ...Object.keys(paymentsByDay),
+        ...Object.keys(transactionsByDay),
+        ...Object.keys(depositsByDay)
+      ]);
+
+      const sortedDays = Array.from(daysSet)
+        .filter(day => day && day !== 'Unknown' && day !== 'Invalid date')
+        .sort();
+
+      const last30Days = sortedDays.slice(-30);
+      const daily = last30Days.map(d => {
+        const incomeFromTx = (transactionsByDay[d] && transactionsByDay[d].income) || 0;
+        const expensesFromTx = (transactionsByDay[d] && transactionsByDay[d].expenses) || 0;
+        const feesCollected = paymentsByDay[d] || 0;
+        const depositsAmt = depositsByDay[d] || 0;
+        const net = (incomeFromTx + feesCollected) - expensesFromTx;
+        return { day: d, income: incomeFromTx, expenses: expensesFromTx, feesCollected, deposits: depositsAmt, net };
       });
 
       // Recent items (latest 20)
@@ -383,7 +421,9 @@ class FinanceService {
           netProfit: Math.round((actualTotalIncome - actualTotalExpenses) * 100) / 100
         },
         monthly,
-        recent: recentItems
+        daily,
+        recent: recentItems,
+        generatedAt: moment().format('YYYY-MM-DD HH:mm:ss')
       };
     } catch (error) {
       console.error('Error getting financial summary:', error);

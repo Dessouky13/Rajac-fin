@@ -218,6 +218,37 @@ class GoogleSheetsService {
     }
   }
 
+  async ensureSheetExists(sheetName) {
+    try {
+      const spreadsheet = await this.sheets.spreadsheets.get({
+        spreadsheetId: this.spreadsheetId
+      });
+
+      const sheetExists = (spreadsheet.data.sheets || []).some(
+        sheet => sheet.properties && sheet.properties.title === sheetName
+      );
+
+      if (!sheetExists) {
+        console.log(`Sheet ${sheetName} not found. Creating it now.`);
+        await this.sheets.spreadsheets.batchUpdate({
+          spreadsheetId: this.spreadsheetId,
+          resource: {
+            requests: [{
+              addSheet: {
+                properties: {
+                  title: sheetName
+                }
+              }
+            }]
+          }
+        });
+      }
+    } catch (error) {
+      console.error(`Error ensuring sheet ${sheetName} exists:`, error);
+      throw error;
+    }
+  }
+
   async getSheetData(sheetName, range = '') {
     try {
       const fullRange = range ? `${sheetName}!${range}` : sheetName;
@@ -338,8 +369,8 @@ class GoogleSheetsService {
       const allSheetNames = spreadsheet.data.sheets.map(sheet => sheet.properties.title);
       console.log('Found sheets:', allSheetNames);
       
-      // Sheets to preserve (don't clear)
-      const sheetsToPreserve = ['Analytics'];
+  // Sheets to preserve (don't clear)
+  const sheetsToPreserve = ['Analytics', 'Analytics_Daily'];
       
       // Clear all sheets except Analytics
       const sheetsToClear = allSheetNames.filter(name => 
@@ -411,6 +442,7 @@ class GoogleSheetsService {
       }
 
       // Clear sheet and write assembled rows (preserve header row as first row)
+      await this.ensureSheetExists('Analytics');
       await this.updateSheetHeaders('Analytics', ['Metric', 'Value', 'Details', 'Last_Updated']);
       // Clear any existing data under headers
       await this.clearSheet('Analytics');
@@ -421,11 +453,77 @@ class GoogleSheetsService {
         await this.appendRows('Analytics', rowsToAppend);
       }
 
+  // Also write daily analytics snapshot
+  await this.writeDailyAnalytics(summary, overdueCount);
+
       // Check if we need to create a monthly backup
       await this.checkAndCreateMonthlyBackup(headerRows.slice(1).concat(monthlyRows).concat(recentRows));
     } catch (error) {
       console.error('Error writing analytics:', error);
       throw error;
+    }
+  }
+
+  async writeDailyAnalytics(summary, overdueCount = 0) {
+    try {
+      const now = moment().format('YYYY-MM-DD HH:mm:ss');
+
+      const headerRows = [
+        ['Metric', 'Value', 'Details', 'Last_Updated'],
+        ['Total Cash In Hand', summary?.cash?.totalCashInHand || 0, summary?.cash?.description || '', now],
+        ['Total In Bank', summary?.bank?.totalInBank || 0, summary?.bank?.description || '', now],
+        ['Total Students', summary?.students?.totalStudents || 0, '', now],
+        ['Active Students', summary?.students?.activeStudents || 0, '', now],
+        ['Total Fees Expected', summary?.students?.totalFeesExpected || 0, '', now],
+        ['Total Fees Collected', summary?.students?.totalFeesCollected || 0, '', now],
+        ['Total Outstanding', summary?.students?.totalOutstanding || 0, '', now],
+        ['Collection Rate', summary?.students?.collectionRate || '0%', '', now],
+        ['Total Income', summary?.transactions?.totalIncome || 0, '', now],
+        ['Total Expenses', summary?.transactions?.totalExpenses || 0, '', now],
+        ['Net Profit', summary?.transactions?.netProfit || 0, '', now],
+        ['Total Overdue Students', overdueCount || 0, '', now]
+      ];
+
+      const dailyRows = [];
+      if (Array.isArray(summary?.daily) && summary.daily.length > 0) {
+        dailyRows.push(['--']);
+        dailyRows.push(['Daily Breakdown (YYYY-MM-DD)', 'Income', 'Expenses', 'Fees Collected', 'Deposits', 'Net', 'Last_Updated']);
+        summary.daily.forEach(dayEntry => {
+          dailyRows.push([
+            dayEntry.day || dayEntry.date || '',
+            dayEntry.income || 0,
+            dayEntry.expenses || 0,
+            dayEntry.feesCollected || 0,
+            dayEntry.deposits || 0,
+            dayEntry.net || 0,
+            now
+          ]);
+        });
+      }
+
+      const recentRows = [];
+      if (Array.isArray(summary?.recent) && summary.recent.length > 0) {
+        recentRows.push(['--']);
+        recentRows.push(['Recent Items', 'Type', 'Date', 'Amount', 'Method/Notes', 'Last_Updated']);
+        summary.recent.slice(0, 20).forEach(it => {
+          const type = it.kind || (it.type || 'item');
+          const date = it.date || '';
+          const amount = it.amount || '';
+          const method = it.method || (it.raw && JSON.stringify(it.raw)) || '';
+          recentRows.push([type, it.kind || '', date, amount, method, now]);
+        });
+      }
+
+      await this.ensureSheetExists('Analytics_Daily');
+      await this.updateSheetHeaders('Analytics_Daily', ['Metric', 'Value', 'Details', 'Last_Updated']);
+      await this.clearSheet('Analytics_Daily');
+
+      const rowsToAppend = headerRows.slice(1).concat(dailyRows).concat(recentRows);
+      if (rowsToAppend.length > 0) {
+        await this.appendRows('Analytics_Daily', rowsToAppend);
+      }
+    } catch (error) {
+      console.error('Error writing daily analytics:', error);
     }
   }
 
