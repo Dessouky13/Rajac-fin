@@ -701,6 +701,38 @@ app.post('/api/bank/deposit', async (req, res) => {
   }
 });
 
+app.post('/api/bank/withdraw', async (req, res) => {
+  try {
+    const { amount, bankName, withdrawnBy, notes } = req.body;
+
+    if (!amount || !bankName) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        message: 'amount and bankName are required'
+      });
+    }
+
+    const result = await financeService.recordBankWithdrawal(
+      parseFloat(amount),
+      bankName,
+      withdrawnBy || 'Finance Team',
+      notes || ''
+    );
+
+    res.json({
+      success: true,
+      message: 'Bank withdrawal recorded successfully',
+      data: result
+    });
+  } catch (error) {
+    console.error('Error recording bank withdrawal:', error);
+    res.status(500).json({
+      error: 'Failed to record bank withdrawal',
+      message: error.message
+    });
+  }
+});
+
 // Admin endpoint: normalize Master_Students numeric fields (Net_Amount, Remaining_Balance)
 app.post('/api/students/normalize', async (req, res) => {
   try {
@@ -768,6 +800,16 @@ app.post('/api/admin/backup-analytics', async (req, res) => {
     }
   } catch (error) {
     console.error('Error creating analytics backup:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+app.post('/api/admin/cleanup-duplicate-deposits', async (req, res) => {
+  try {
+    const result = await financeService.cleanupDuplicateBankDeposits();
+    return res.json(result);
+  } catch (error) {
+    console.error('Error cleaning up duplicate deposits:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 });

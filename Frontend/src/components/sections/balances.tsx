@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { StatsCard } from "@/components/ui/stats-card";
 import { useToast } from "@/hooks/use-toast";
-import { getCashSummary, getOverdueList, saveBankDeposit } from "@/lib/api";
+import { getCashSummary, getOverdueList, saveBankDeposit, saveBankWithdrawal } from "@/lib/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { 
   DollarSign, 
@@ -21,6 +21,7 @@ import {
   ArrowUpDown,
   Plus
 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface CashSummary {
   availableCash: number;
@@ -41,11 +42,12 @@ export function Balances() {
   const [activePaymentNo, setActivePaymentNo] = useState<number>(1);
   const [overdueStudents, setOverdueStudents] = useState<OverdueStudent[]>([]);
   const [loading, setLoading] = useState(false);
-  const [showDepositForm, setShowDepositForm] = useState(false);
-  const [depositForm, setDepositForm] = useState({
+  const [showTransferForm, setShowTransferForm] = useState(false);
+  const [transferForm, setTransferForm] = useState({
     amount: "",
     date: new Date().toISOString().split('T')[0],
-    note: ""
+    note: "",
+    direction: "deposit" as "deposit" | "withdraw"
   });
   const { toast } = useToast();
 
@@ -82,11 +84,21 @@ export function Balances() {
     }
   };
 
-  const handleBankDeposit = async () => {
-    if (!depositForm.amount) {
+  const handleBankTransfer = async () => {
+    if (!transferForm.amount) {
       toast({
-        title: "خطأ",
-        description: "يرجى إدخال مبلغ الإيداع",
+        title: t("خطأ", "Error"),
+        description: t("يرجى إدخال مبلغ التحويل", "Please enter a transfer amount"),
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const parsedAmount = parseFloat(transferForm.amount);
+    if (!parsedAmount || parsedAmount <= 0) {
+      toast({
+        title: t("خطأ", "Error"),
+        description: t("المبلغ يجب أن يكون أكبر من صفر", "Amount must be greater than zero"),
         variant: "destructive"
       });
       return;
@@ -94,48 +106,53 @@ export function Balances() {
 
     setLoading(true);
     try {
-      const response = await saveBankDeposit({
-        amount: parseFloat(depositForm.amount),
-        bankName: 'Default Bank',
-        depositedBy: 'Frontend User',
-        notes: depositForm.note || undefined
+      const isDeposit = transferForm.direction === "deposit";
+      const response = isDeposit
+        ? await saveBankDeposit({
+            amount: parsedAmount,
+            bankName: 'Default Bank',
+            depositedBy: 'Frontend User',
+            notes: transferForm.note || undefined
+          })
+        : await saveBankWithdrawal({
+            amount: parsedAmount,
+            bankName: 'Default Bank',
+            withdrawnBy: 'Frontend User',
+            notes: transferForm.note || undefined
+          });
+
+      if (!response.ok) {
+        throw new Error(response.message || 'transfer failed');
+      }
+
+      const successMessage = isDeposit
+        ? t("تم تحويل المبلغ إلى البنك", "Cash moved to bank successfully")
+        : t("تم سحب المبلغ من البنك", "Bank funds moved to cash successfully");
+
+      toast({
+        title: t("نجاح", "Success"),
+        description: successMessage
       });
 
-      if (response.ok) {
-        toast({
-          title: "تم الإيداع بنجاح",
-          description: `تم إيداع ${depositForm.amount} جنيه في البنك`,
-        });
-        
-        // Optimistically update cashSummary locally
-        const amt = parseFloat(depositForm.amount || '0') || 0;
-        setCashSummary(prev => ({
-          availableCash: Math.max(0, prev.availableCash - amt),
-          availableBank: prev.availableBank + amt
-        }));
+      setCashSummary(prev => ({
+        availableCash: isDeposit ? prev.availableCash - parsedAmount : prev.availableCash + parsedAmount,
+        availableBank: isDeposit ? prev.availableBank + parsedAmount : prev.availableBank - parsedAmount
+      }));
 
-        // Reset form
-        setDepositForm({
-          amount: "",
-          date: new Date().toISOString().split('T')[0],
-          note: ""
-        });
-        setShowDepositForm(false);
-        
-        // Refresh data in background to ensure authoritative values
-        setTimeout(() => loadData(), 500);
-        try { window.dispatchEvent(new CustomEvent('finance.updated')); } catch(e) {}
-      } else {
-        toast({
-          title: "فشل في الإيداع",
-          description: response.message || "حدث خطأ أثناء الإيداع",
-          variant: "destructive"
-        });
-      }
+      setTransferForm({
+        amount: "",
+        date: new Date().toISOString().split('T')[0],
+        note: "",
+        direction: "deposit"
+      });
+      setShowTransferForm(false);
+
+      setTimeout(() => loadData(), 500);
+      try { window.dispatchEvent(new CustomEvent('finance.updated')); } catch (e) {}
     } catch (error) {
       toast({
-        title: "خطأ في الإيداع",
-        description: "حدث خطأ أثناء إيداع المبلغ",
+        title: t("خطأ", "Error"),
+        description: t("فشل في تسجيل التحويل", "Failed to record transfer"),
         variant: "destructive"
       });
     } finally {
@@ -200,7 +217,7 @@ export function Balances() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Financial Summary & Bank Deposit */}
+        {/* Financial Summary & Bank Transfer */}
         <Card className="card-hover bg-gradient-card scale-in">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -210,11 +227,11 @@ export function Balances() {
               </div>
               <Button
                 size="sm"
-                onClick={() => setShowDepositForm(!showDepositForm)}
+                onClick={() => setShowTransferForm(!showTransferForm)}
                 className="bg-primary hover:bg-primary/90"
               >
                 <Plus className={`h-4 w-4 ${isArabic ? 'ml-2' : 'mr-2'}`} />
-                {t("إيداع بنكي", "Bank Deposit")}
+                {t("تحويل بنكي", "Bank Transfer")}
               </Button>
             </CardTitle>
           </CardHeader>
@@ -236,54 +253,75 @@ export function Balances() {
               </div>
             </div>
 
-            {/* Bank Deposit Form */}
-            {showDepositForm && (
+            {/* Bank Transfer Form */}
+            {showTransferForm && (
               <div className="border-t pt-4 mt-4">
                 <h4 className="text-sm font-semibold mb-3 flex items-center">
                   <ArrowUpDown className={`h-4 w-4 ${isArabic ? 'ml-2' : 'mr-2'}`} />
-                  {t("إيداع من النقد إلى البنك", "Transfer from Cash to Bank")}
+                  {transferForm.direction === 'deposit'
+                    ? t("تحويل من النقد إلى البنك", "Transfer from cash to bank")
+                    : t("تحويل من البنك إلى النقد", "Transfer from bank to cash")}
                 </h4>
                 <div className="space-y-3">
                   <div>
-                    <Label htmlFor="depositAmount">{t("مبلغ الإيداع", "Deposit Amount")}</Label>
+                    <Label htmlFor="transferType">{t("نوع التحويل", "Transfer type")}</Label>
+                    <Select
+                      value={transferForm.direction}
+                      onValueChange={(value: "deposit" | "withdraw") =>
+                        setTransferForm({ ...transferForm, direction: value })
+                      }
+                    >
+                      <SelectTrigger id="transferType">
+                        <SelectValue placeholder={t("اختيار النوع", "Select type")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="deposit">{t("من النقد إلى البنك", "Cash to bank")}</SelectItem>
+                        <SelectItem value="withdraw">{t("من البنك إلى النقد", "Bank to cash")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="transferAmount">{t("المبلغ", "Amount")}</Label>
                     <Input
-                      id="depositAmount"
+                      id="transferAmount"
                       type="number"
                       placeholder={t("المبلغ", "Amount")}
-                      value={depositForm.amount}
-                      onChange={(e) => setDepositForm({...depositForm, amount: e.target.value})}
+                      value={transferForm.amount}
+                      onChange={(e) => setTransferForm({ ...transferForm, amount: e.target.value })}
                     />
                   </div>
                   <div>
-                    <Label htmlFor="depositDate">{t("تاريخ الإيداع", "Deposit Date")}</Label>
+                    <Label htmlFor="transferDate">{t("تاريخ العملية", "Transfer date")}</Label>
                     <Input
-                      id="depositDate"
+                      id="transferDate"
                       type="date"
-                      value={depositForm.date}
-                      onChange={(e) => setDepositForm({...depositForm, date: e.target.value})}
+                      value={transferForm.date}
+                      onChange={(e) => setTransferForm({ ...transferForm, date: e.target.value })}
                     />
                   </div>
                   <div>
-                    <Label htmlFor="depositNote">{t("ملاحظة (اختياري)", "Note (Optional)")}</Label>
+                    <Label htmlFor="transferNote">{t("ملاحظة (اختياري)", "Note (optional)")}</Label>
                     <Textarea
-                      id="depositNote"
+                      id="transferNote"
                       placeholder={t("ملاحظة...", "Note...")}
-                      value={depositForm.note}
-                      onChange={(e) => setDepositForm({...depositForm, note: e.target.value})}
+                      value={transferForm.note}
+                      onChange={(e) => setTransferForm({ ...transferForm, note: e.target.value })}
                       rows={2}
                     />
                   </div>
                   <div className="flex gap-2">
                     <Button 
-                      onClick={handleBankDeposit} 
+                      onClick={handleBankTransfer}
                       disabled={loading}
                       size="sm"
                       className="flex-1"
                     >
-                      {t("إيداع", "Deposit")}
+                      {transferForm.direction === 'deposit'
+                        ? t("تنفيذ الإيداع", "Deposit")
+                        : t("تنفيذ السحب", "Withdraw")}
                     </Button>
                     <Button 
-                      onClick={() => setShowDepositForm(false)} 
+                      onClick={() => setShowTransferForm(false)} 
                       variant="outline"
                       size="sm"
                       className="flex-1"

@@ -91,6 +91,47 @@ class FinanceService {
     }
   }
 
+  async recordBankWithdrawal(amount, bankName, withdrawnBy = 'System', notes = '') {
+    try {
+      const withdrawalId = this.generateDepositId();
+      const date = moment().format('YYYY-MM-DD HH:mm:ss');
+      const normalizedAmount = -Math.abs(amount);
+
+      const withdrawalRow = [
+        withdrawalId,
+        date,
+        normalizedAmount,
+        bankName,
+        withdrawnBy,
+        notes || 'Withdrawal to cash'
+      ];
+
+      await googleSheets.appendRows('Bank_Deposits', [withdrawalRow]);
+
+      try {
+        const summary = await this.getFinancialSummary();
+        await googleSheets.writeAnalytics(summary);
+      } catch (err) {
+        console.error('Warning: failed to update analytics after bank withdrawal:', err && err.message ? err.message : err);
+      }
+
+      return {
+        success: true,
+        withdrawal: {
+          withdrawalId,
+          date,
+          amount: normalizedAmount,
+          bankName,
+          withdrawnBy,
+          notes
+        }
+      };
+    } catch (error) {
+      console.error('Error recording bank withdrawal:', error);
+      throw error;
+    }
+  }
+
   generateTransactionId() {
     const date = moment().format('YYYYMMDD');
     const random = Math.floor(1000 + Math.random() * 9000);

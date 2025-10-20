@@ -230,6 +230,15 @@ export async function saveBankDeposit(data: {
   return apiSend('/bank/deposit', data, 'POST');
 }
 
+export async function saveBankWithdrawal(data: {
+  amount: number;
+  bankName: string;
+  withdrawnBy?: string;
+  notes?: string;
+}): Promise<ApiResponse<any>> {
+  return apiSend('/bank/withdraw', data, 'POST');
+}
+
 // In/Out transaction API calls
 export async function saveInOut(data: {
   type: string;
