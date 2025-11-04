@@ -8,7 +8,7 @@ import { MoreHorizontal } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import rajacLogo from "@/assets/rajac-logo-hd.png";
 import { downloadMasterSheet, deleteAllData, updateInstallments } from "@/lib/api";
-import { adminUndo } from "@/lib/api";
+import { adminUndo, fetchAdminActions, undoAction } from "@/lib/api";
 import { RotateCw } from 'lucide-react';
 
 export function Header() {
@@ -79,13 +79,25 @@ export function Header() {
             </DropdownMenuContent>
           </DropdownMenu>
           <Button variant="outline" size="sm" onClick={async () => {
-            if (!confirm('Undo last action? This will revert up to 3 recent operations.')) return;
-            const res = await adminUndo(1);
-            if (res.ok) {
-              alert('Undo successful');
+            // Fetch last 3 actions and let the admin choose which one to undo.
+            const resp = await fetchAdminActions(3);
+            if (!resp.ok || !resp.data) { alert('Failed to fetch recent actions'); return; }
+            const actions = resp.data as any[];
+            if (!actions || actions.length === 0) { alert('No recent actions to undo'); return; }
+            // Build a simple selection prompt
+            const options = actions.map((a, i) => `${i+1}. ${a.actionType} - ${a.refId} (${a.ts})`).join('\n');
+            const choice = prompt(`Select action to undo by number:\n${options}\nEnter 1-${actions.length} or Cancel`);
+            if (!choice) return;
+            const idx = Number(choice) - 1;
+            if (isNaN(idx) || idx < 0 || idx >= actions.length) { alert('Invalid selection'); return; }
+            const action = actions[idx];
+            if (!confirm(`Are you sure you want to undo: ${action.actionType} (${action.refId})?`)) return;
+            const undoRes = await undoAction(action.actionId);
+            if (undoRes.ok) {
+              alert('Action reverted');
               try { window.dispatchEvent(new CustomEvent('finance.updated')); } catch(e) {}
             } else {
-              alert('Undo failed: ' + (res.message || 'Unknown error'));
+              alert('Revert failed: ' + (undoRes.message || 'Unknown error'));
             }
           }} className="hover:scale-105">
             <RotateCw className="h-4 w-4" />

@@ -228,6 +228,14 @@ export async function adminUndo(count: number = 1): Promise<ApiResponse<any>> {
   return apiSend('/admin/undo', { count }, 'POST');
 }
 
+export async function fetchAdminActions(count: number = 3): Promise<ApiResponse<any>> {
+  return apiGet('/admin/actions', { count });
+}
+
+export async function undoAction(actionId: string): Promise<ApiResponse<any>> {
+  return apiSend('/admin/undo-action', { actionId }, 'POST');
+}
+
 // Bank deposit API calls
 export async function saveBankDeposit(data: {
   amount: number;

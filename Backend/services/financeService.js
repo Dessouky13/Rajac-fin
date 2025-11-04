@@ -175,176 +175,8 @@ class FinanceService {
 
       for (const a of toRevert) {
         try {
-          const details = a.details ? JSON.parse(a.details) : {};
-          // Handle student fee update revert
-          if (a.actionType === 'update_fees' && details.before) {
-            // details.before should contain previous totalFees/netAmount/remainingBalance and refId is studentId
-            const studentId = a.refId;
-            const before = details.before;
-            // Find student in Master_Students and update with before values
-            const master = await googleSheets.getSheetData('Master_Students');
-            if (master.length > 1) {
-              const headers = master[0];
-              const idIndex = headers.indexOf('Student_ID');
-              for (let i = 1; i < master.length; i++) {
-                if ((master[i][idIndex] || '') === studentId) {
-                  // Build updated row using existing fields, but restore Total_Fees, Net_Amount, Remaining_Balance
-                  const r = {};
-                  headers.forEach((h, idx) => { r[h] = master[i][idx] || ''; });
-                  const updatedRow = [
-                    r.Student_ID || '',
-                    r.Name || '',
-                    r.Year || '',
-                    r.Number_of_Subjects || 0,
-                    before.totalFees || before.Total_Fees || 0,
-                    r.Discount_Percent || 0,
-                    r.Discount_Amount || 0,
-                    before.netAmount || before.Net_Amount || 0,
-                    r.Total_Paid || 0,
-                    before.remainingBalance || before.Remaining_Balance || 0,
-                    r.Phone_Number || '',
-                    r.Enrollment_Date || '',
-                    (before.remainingBalance || before.Remaining_Balance || 0) <= 0 ? 'Paid' : (r.Status || 'Active'),
-                    r.Last_Payment_Date || ''
-                  ];
-                  await googleSheets.updateRow('Master_Students', i + 1, updatedRow);
-                  reverted++;
-                  break;
-                }
-              }
-            }
-          }
-          
-          // Handle student payment revert
-          if (a.actionType === 'student_payment' && details.paymentRow) {
-            const paymentId = a.refId;
-            const payments = await googleSheets.getSheetData('Payments_Log');
-            if (payments.length > 1) {
-              const headers = payments[0];
-              const idIndex = headers.indexOf('Payment_ID');
-              for (let i = 1; i < payments.length; i++) {
-                if ((payments[i][idIndex] || '') === paymentId) {
-                  // Clear the payment row
-                  await googleSheets.sheets.spreadsheets.values.clear({ spreadsheetId: googleSheets.spreadsheetId, range: `Payments_Log!A${i+1}:L${i+1}` });
-                  reverted++;
-                  break;
-                }
-              }
-            }
-            // Also attempt to restore Master_Students totals from before snapshot if present
-            if (details.before && details.paymentRow) {
-              const studentId = details.paymentRow[1];
-              const master = await googleSheets.getSheetData('Master_Students');
-              if (master.length > 1) {
-                const headers = master[0];
-                const idIndex = headers.indexOf('Student_ID');
-                for (let i = 1; i < master.length; i++) {
-                  if ((master[i][idIndex] || '') === studentId) {
-                    const r = {};
-                    headers.forEach((h, idx) => { r[h] = master[i][idx] || ''; });
-                    const updatedRow = [
-                      r.Student_ID || '',
-                      r.Name || '',
-                      r.Year || '',
-                      r.Number_of_Subjects || 0,
-                      r.Total_Fees || 0,
-                      r.Discount_Percent || 0,
-                      r.Discount_Amount || 0,
-                      r.Net_Amount || 0,
-                      details.before.totalPaid || r.Total_Paid || 0,
-                      details.before.remainingBalance || r.Remaining_Balance || 0,
-                      r.Phone_Number || '',
-                      r.Enrollment_Date || '',
-                      (details.before.remainingBalance || r.Remaining_Balance || 0) <= 0 ? 'Paid' : (r.Status || 'Active'),
-                      r.Last_Payment_Date || ''
-                    ];
-                    await googleSheets.updateRow('Master_Students', i + 1, updatedRow);
-                    break;
-                  }
-                }
-              }
-            }
-          }
-          
-          // Handle apply_discount revert
-          if (a.actionType === 'apply_discount' && details.before) {
-            const studentId = a.refId;
-            const master = await googleSheets.getSheetData('Master_Students');
-            if (master.length > 1) {
-              const headers = master[0];
-              const idIndex = headers.indexOf('Student_ID');
-              for (let i = 1; i < master.length; i++) {
-                if ((master[i][idIndex] || '') === studentId) {
-                  const r = {};
-                  headers.forEach((h, idx) => { r[h] = master[i][idx] || ''; });
-                  const updatedRow = [
-                    r.Student_ID || '',
-                    r.Name || '',
-                    r.Year || '',
-                    r.Number_of_Subjects || 0,
-                    details.before.totalFees || r.Total_Fees || 0,
-                    details.before.discountPercent || r.Discount_Percent || 0,
-                    details.before.discountAmount || r.Discount_Amount || 0,
-                    details.before.netAmount || r.Net_Amount || 0,
-                    r.Total_Paid || 0,
-                    details.before.remainingBalance || r.Remaining_Balance || 0,
-                    r.Phone_Number || '',
-                    r.Enrollment_Date || '',
-                    (details.before.remainingBalance || r.Remaining_Balance || 0) <= 0 ? 'Paid' : (r.Status || 'Active'),
-                    r.Last_Payment_Date || ''
-                  ];
-                  await googleSheets.updateRow('Master_Students', i + 1, updatedRow);
-                  reverted++;
-                  break;
-                }
-              }
-            }
-          }
-
-          // Existing transaction handling
-          if (a.actionType === 'transaction' && details.transactionRow) {
-            // Remove matching transaction by Transaction_ID in In_Out_Transactions
-            const txId = a.refId;
-            const data = await googleSheets.getSheetData('In_Out_Transactions');
-            if (data.length > 1) {
-              const headers = data[0];
-              const idIndex = headers.indexOf('Transaction_ID');
-              for (let i = 1; i < data.length; i++) {
-                if (data[i][idIndex] === txId) {
-                  await googleSheets.sheets.spreadsheets.values.clear({ spreadsheetId: googleSheets.spreadsheetId, range: `In_Out_Transactions!A${i+1}:I${i+1}` });
-                  reverted++;
-                  break;
-                }
-              }
-            }
-          }
-
-          if ((a.actionType === 'bank_deposit' || a.actionType === 'bank_withdrawal') && (details.depositRow || details.withdrawalRow)) {
-            const depId = a.refId;
-            const data = await googleSheets.getSheetData('Bank_Deposits');
-            if (data.length > 1) {
-              const headers = data[0];
-              const idIndex = headers.indexOf('Deposit_ID');
-              for (let i = 1; i < data.length; i++) {
-                if (data[i][idIndex] === depId) {
-                  await googleSheets.sheets.spreadsheets.values.clear({ spreadsheetId: googleSheets.spreadsheetId, range: `Bank_Deposits!A${i+1}:F${i+1}` });
-                  reverted++;
-                  break;
-                }
-              }
-            }
-          }
-
-          // Remove action log row itself
-          // Find the action in sheet and clear it
-          const allActions = await googleSheets.getSheetData('Actions_Log');
-          const actionHeaders = allActions[0];
-          for (let i = 1; i < allActions.length; i++) {
-            if (allActions[i][0] === a.actionId) {
-              await googleSheets.sheets.spreadsheets.values.clear({ spreadsheetId: googleSheets.spreadsheetId, range: `Actions_Log!A${i+1}:F${i+1}` });
-              break;
-            }
-          }
+          const ok = await this.revertActionById(a.actionId);
+          if (ok) reverted++;
         } catch (innerErr) {
           console.error('Error reverting action', a, innerErr);
         }
@@ -362,6 +194,202 @@ class FinanceService {
     } catch (error) {
       console.error('Error reverting actions:', error);
       throw error;
+    }
+  }
+
+  // Revert a single action by its actionId. Returns true if an action was reverted.
+  async revertActionById(actionId) {
+    try {
+      if (!actionId) return false;
+      const allActions = await googleSheets.getSheetData('Actions_Log');
+      if (allActions.length <= 1) return false;
+
+      // Find the action row and its index
+      let actionRow = null;
+      let actionRowIndex = -1;
+      for (let i = 1; i < allActions.length; i++) {
+        if ((allActions[i][0] || '') === actionId) {
+          actionRow = allActions[i];
+          actionRowIndex = i + 1; // 1-based in Sheets
+          break;
+        }
+      }
+
+      if (!actionRow) return false;
+
+      const a = {
+        actionId: actionRow[0],
+        ts: actionRow[1],
+        actionType: actionRow[2],
+        refId: actionRow[3],
+        performedBy: actionRow[4],
+        details: actionRow[5]
+      };
+
+      const details = a.details ? JSON.parse(a.details) : {};
+
+      // Handle student fee update revert
+      if (a.actionType === 'update_fees' && details.before) {
+        const studentId = a.refId;
+        const before = details.before;
+        const master = await googleSheets.getSheetData('Master_Students');
+        if (master.length > 1) {
+          const headers = master[0];
+          const idIndex = headers.indexOf('Student_ID');
+          for (let i = 1; i < master.length; i++) {
+            if ((master[i][idIndex] || '') === studentId) {
+              const r = {};
+              headers.forEach((h, idx) => { r[h] = master[i][idx] || ''; });
+              const updatedRow = [
+                r.Student_ID || '',
+                r.Name || '',
+                r.Year || '',
+                r.Number_of_Subjects || 0,
+                before.totalFees || before.Total_Fees || 0,
+                r.Discount_Percent || 0,
+                r.Discount_Amount || 0,
+                before.netAmount || before.Net_Amount || 0,
+                r.Total_Paid || 0,
+                before.remainingBalance || before.Remaining_Balance || 0,
+                r.Phone_Number || '',
+                r.Enrollment_Date || '',
+                (before.remainingBalance || before.Remaining_Balance || 0) <= 0 ? 'Paid' : (r.Status || 'Active'),
+                r.Last_Payment_Date || ''
+              ];
+              await googleSheets.updateRow('Master_Students', i + 1, updatedRow);
+              // Remove action log row
+              await googleSheets.sheets.spreadsheets.values.clear({ spreadsheetId: googleSheets.spreadsheetId, range: `Actions_Log!A${actionRowIndex}:F${actionRowIndex}` });
+              return true;
+            }
+          }
+        }
+      }
+
+      // Handle student payment revert
+      if (a.actionType === 'student_payment' && details.paymentRow) {
+        const paymentId = a.refId;
+        const payments = await googleSheets.getSheetData('Payments_Log');
+        if (payments.length > 1) {
+          const headers = payments[0];
+          const idIndex = headers.indexOf('Payment_ID');
+          for (let i = 1; i < payments.length; i++) {
+            if ((payments[i][idIndex] || '') === paymentId) {
+              await googleSheets.sheets.spreadsheets.values.clear({ spreadsheetId: googleSheets.spreadsheetId, range: `Payments_Log!A${i+1}:L${i+1}` });
+              // Attempt to restore Master_Students totals from before snapshot if present
+              if (details.before && details.paymentRow) {
+                const studentId = details.paymentRow[1];
+                const master = await googleSheets.getSheetData('Master_Students');
+                if (master.length > 1) {
+                  const mHeaders = master[0];
+                  const idIdx = mHeaders.indexOf('Student_ID');
+                  for (let j = 1; j < master.length; j++) {
+                    if ((master[j][idIdx] || '') === studentId) {
+                      const r = {};
+                      mHeaders.forEach((h, idx) => { r[h] = master[j][idx] || ''; });
+                      const updatedRow = [
+                        r.Student_ID || '',
+                        r.Name || '',
+                        r.Year || '',
+                        r.Number_of_Subjects || 0,
+                        r.Total_Fees || 0,
+                        r.Discount_Percent || 0,
+                        r.Discount_Amount || 0,
+                        r.Net_Amount || 0,
+                        details.before.totalPaid || r.Total_Paid || 0,
+                        details.before.remainingBalance || r.Remaining_Balance || 0,
+                        r.Phone_Number || '',
+                        r.Enrollment_Date || '',
+                        (details.before.remainingBalance || r.Remaining_Balance || 0) <= 0 ? 'Paid' : (r.Status || 'Active'),
+                        r.Last_Payment_Date || ''
+                      ];
+                      await googleSheets.updateRow('Master_Students', j + 1, updatedRow);
+                      break;
+                    }
+                  }
+                }
+              }
+              // Remove action log row
+              await googleSheets.sheets.spreadsheets.values.clear({ spreadsheetId: googleSheets.spreadsheetId, range: `Actions_Log!A${actionRowIndex}:F${actionRowIndex}` });
+              return true;
+            }
+          }
+        }
+      }
+
+      // Handle apply_discount revert
+      if (a.actionType === 'apply_discount' && details.before) {
+        const studentId = a.refId;
+        const master = await googleSheets.getSheetData('Master_Students');
+        if (master.length > 1) {
+          const headers = master[0];
+          const idIndex = headers.indexOf('Student_ID');
+          for (let i = 1; i < master.length; i++) {
+            if ((master[i][idIndex] || '') === studentId) {
+              const r = {};
+              headers.forEach((h, idx) => { r[h] = master[i][idx] || ''; });
+              const updatedRow = [
+                r.Student_ID || '',
+                r.Name || '',
+                r.Year || '',
+                r.Number_of_Subjects || 0,
+                details.before.totalFees || r.Total_Fees || 0,
+                details.before.discountPercent || r.Discount_Percent || 0,
+                details.before.discountAmount || r.Discount_Amount || 0,
+                details.before.netAmount || r.Net_Amount || 0,
+                r.Total_Paid || 0,
+                details.before.remainingBalance || r.Remaining_Balance || 0,
+                r.Phone_Number || '',
+                r.Enrollment_Date || '',
+                (details.before.remainingBalance || r.Remaining_Balance || 0) <= 0 ? 'Paid' : (r.Status || 'Active'),
+                r.Last_Payment_Date || ''
+              ];
+              await googleSheets.updateRow('Master_Students', i + 1, updatedRow);
+              await googleSheets.sheets.spreadsheets.values.clear({ spreadsheetId: googleSheets.spreadsheetId, range: `Actions_Log!A${actionRowIndex}:F${actionRowIndex}` });
+              return true;
+            }
+          }
+        }
+      }
+
+      // Transaction handling
+      if (a.actionType === 'transaction' && details.transactionRow) {
+        const txId = a.refId;
+        const data = await googleSheets.getSheetData('In_Out_Transactions');
+        if (data.length > 1) {
+          const headers = data[0];
+          const idIndex = headers.indexOf('Transaction_ID');
+          for (let i = 1; i < data.length; i++) {
+            if ((data[i][idIndex] || '') === txId) {
+              await googleSheets.sheets.spreadsheets.values.clear({ spreadsheetId: googleSheets.spreadsheetId, range: `In_Out_Transactions!A${i+1}:I${i+1}` });
+              await googleSheets.sheets.spreadsheets.values.clear({ spreadsheetId: googleSheets.spreadsheetId, range: `Actions_Log!A${actionRowIndex}:F${actionRowIndex}` });
+              return true;
+            }
+          }
+        }
+      }
+
+      if ((a.actionType === 'bank_deposit' || a.actionType === 'bank_withdrawal') && (details.depositRow || details.withdrawalRow)) {
+        const depId = a.refId;
+        const data = await googleSheets.getSheetData('Bank_Deposits');
+        if (data.length > 1) {
+          const headers = data[0];
+          const idIndex = headers.indexOf('Deposit_ID');
+          for (let i = 1; i < data.length; i++) {
+            if ((data[i][idIndex] || '') === depId) {
+              await googleSheets.sheets.spreadsheets.values.clear({ spreadsheetId: googleSheets.spreadsheetId, range: `Bank_Deposits!A${i+1}:F${i+1}` });
+              await googleSheets.sheets.spreadsheets.values.clear({ spreadsheetId: googleSheets.spreadsheetId, range: `Actions_Log!A${actionRowIndex}:F${actionRowIndex}` });
+              return true;
+            }
+          }
+        }
+      }
+
+      // If nothing matched, just clear the action log row to avoid repeating
+      await googleSheets.sheets.spreadsheets.values.clear({ spreadsheetId: googleSheets.spreadsheetId, range: `Actions_Log!A${actionRowIndex}:F${actionRowIndex}` });
+      return true;
+    } catch (error) {
+      console.error('Error reverting single action:', error);
+      return false;
     }
   }
 

@@ -590,6 +590,49 @@ app.post('/api/admin/undo', async (req, res) => {
   }
 });
 
+// Admin: list recent actions (default 3)
+app.get('/api/admin/actions', async (req, res) => {
+  try {
+    const count = Math.min(10, Number(req.query.count) || 3);
+    const actionsSheet = await googleSheets.getSheetData('Actions_Log');
+    if (actionsSheet.length <= 1) return res.json({ success: true, actions: [] });
+
+    const actions = actionsSheet.slice(1).map((row, idx) => ({
+      actionId: row[0],
+      ts: row[1],
+      actionType: row[2],
+      refId: row[3],
+      performedBy: row[4],
+      details: row[5],
+      rowIndex: idx + 2 // sheet row number
+    })).reverse().slice(0, count);
+
+    res.json({ success: true, actions });
+  } catch (error) {
+    console.error('Error listing admin actions:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Admin: undo a specific action by actionId
+app.post('/api/admin/undo-action', async (req, res) => {
+  try {
+    const { actionId } = req.body;
+    if (!actionId) return res.status(400).json({ success: false, error: 'actionId required' });
+    const ok = await financeService.revertActionById(actionId);
+    if (ok) {
+      // Refresh analytics
+      const summary = await financeService.getFinancialSummary();
+      await googleSheets.writeAnalytics(summary);
+      return res.json({ success: true, message: 'Action reverted', actionId });
+    }
+    return res.status(404).json({ success: false, error: 'Action not found or could not be reverted' });
+  } catch (error) {
+    console.error('Error reverting specific action:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Apply a discount to a student
 app.post('/api/payments/apply-discount', async (req, res) => {
   try {
