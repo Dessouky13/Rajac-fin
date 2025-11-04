@@ -8,6 +8,8 @@ import { MoreHorizontal } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import rajacLogo from "@/assets/rajac-logo-hd.png";
 import { downloadMasterSheet, deleteAllData, updateInstallments } from "@/lib/api";
+import { adminUndo } from "@/lib/api";
+import { RotateCw } from 'lucide-react';
 
 export function Header() {
   const { isArabic, setIsArabic, t } = useLanguage();
@@ -76,6 +78,19 @@ export function Header() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <Button variant="outline" size="sm" onClick={async () => {
+            if (!confirm('Undo last action? This will revert up to 3 recent operations.')) return;
+            const res = await adminUndo(1);
+            if (res.ok) {
+              alert('Undo successful');
+              try { window.dispatchEvent(new CustomEvent('finance.updated')); } catch(e) {}
+            } else {
+              alert('Undo failed: ' + (res.message || 'Unknown error'));
+            }
+          }} className="hover:scale-105">
+            <RotateCw className="h-4 w-4" />
+            <span className="text-sm">Undo</span>
+          </Button>
           <UploadStudentsButton />
           <ProcessDriveStudentsButton />
           <ThemeToggle />

@@ -561,6 +561,35 @@ app.post('/api/payments/process', async (req, res) => {
   }
 });
 
+// Update student's total fees (base fees)
+app.put('/api/students/update-fees', async (req, res) => {
+  try {
+    const { studentId, totalFees, performedBy } = req.body;
+    if (!studentId || totalFees === undefined) {
+      return res.status(400).json({ success: false, error: 'Missing required fields: studentId and totalFees' });
+    }
+
+    const result = await studentService.updateStudentFees(studentId, Number(totalFees), performedBy || 'Frontend User');
+    res.json({ success: true, message: 'Student fees updated', data: result });
+  } catch (error) {
+    console.error('Error updating student fees:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Admin: revert last N actions (max 3)
+app.post('/api/admin/undo', async (req, res) => {
+  try {
+    const { count } = req.body;
+    const n = Math.min(3, Number(count) || 1);
+    const result = await financeService.revertLastActions(n);
+    res.json({ success: true, message: `Reverted ${result.reverted} actions`, data: result });
+  } catch (error) {
+    console.error('Error reverting actions:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Apply a discount to a student
 app.post('/api/payments/apply-discount', async (req, res) => {
   try {

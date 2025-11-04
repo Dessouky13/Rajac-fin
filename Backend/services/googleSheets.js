@@ -50,6 +50,7 @@ class GoogleSheetsService {
         'Bank_Deposits',
         'Teachers',
         'Overdue_Payments',
+        'Actions_Log',
           'Config',
           'Analytics'
       ];
@@ -64,6 +65,7 @@ class GoogleSheetsService {
       await this.initializeBankDepositsSheet();
       await this.initializeTeachersSheet();
       await this.initializeOverdueSheet();
+      await this.initializeActionsLog();
       await this.initializeConfigSheet();
         await this.initializeAnalyticsSheet();
       
@@ -72,6 +74,11 @@ class GoogleSheetsService {
       console.error('Error initializing spreadsheet:', error);
       throw error;
     }
+  }
+
+  async initializeActionsLog() {
+    const headers = ['Action_ID', 'Timestamp', 'Action_Type', 'Ref_ID', 'Performed_By', 'Details_JSON'];
+    await this.updateSheetHeaders('Actions_Log', headers);
   }
 
   async createSheetIfNotExists(sheetName) {
@@ -186,6 +193,7 @@ class GoogleSheetsService {
     const headers = ['Metric', 'Value', 'Details', 'Last_Updated'];
     await this.updateSheetHeaders('Analytics', headers);
   }
+
 
   async updateSheetHeaders(sheetName, headers) {
     try {

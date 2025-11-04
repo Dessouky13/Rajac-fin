@@ -220,6 +220,14 @@ export async function updateStudentDiscount(data: {
   return apiSend('/payments/apply-discount', data, 'POST');
 }
 
+export async function updateStudentFees(data: { studentId: string; totalFees: number; performedBy?: string }): Promise<ApiResponse<any>> {
+  return apiSend('/students/update-fees', data, 'PUT');
+}
+
+export async function adminUndo(count: number = 1): Promise<ApiResponse<any>> {
+  return apiSend('/admin/undo', { count }, 'POST');
+}
+
 // Bank deposit API calls
 export async function saveBankDeposit(data: {
   amount: number;

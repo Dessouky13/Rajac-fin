@@ -57,6 +57,8 @@ export function Fees() {
     date: new Date().toISOString().split('T')[0]
   });
   const [canEditDiscount, setCanEditDiscount] = useState(false);
+  const [editingFees, setEditingFees] = useState(false);
+  const [editedTotalFees, setEditedTotalFees] = useState<string>('');
   const { toast } = useToast();
 
   const handleSearch = async () => {
@@ -397,7 +399,36 @@ export function Fees() {
               <div className="text-center p-4 bg-background/50 rounded-lg">
                 <p className="text-sm text-muted-foreground">{t("إجمالي الرسوم", "Total Fees")}</p>
                 <p className="text-lg font-semibold text-primary">
-                  {(selectedStudent.baseFees || selectedStudent.fees || 0).toLocaleString()} {t("جنيه", "EGP")}
+                  {!editingFees ? (
+                    <span>
+                      {(selectedStudent.baseFees || selectedStudent.fees || 0).toLocaleString()} {t("جنيه", "EGP")}
+                      <button className="ml-3 text-xs text-primary underline" onClick={() => { setEditingFees(true); setEditedTotalFees(String(selectedStudent.baseFees || selectedStudent.fees || 0)); }}>
+                        Edit
+                      </button>
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center gap-2">
+                      <input type="number" className="w-32 rounded-md border px-2 py-1" value={editedTotalFees} onChange={(e) => setEditedTotalFees(e.target.value)} />
+                      <Button size="sm" onClick={async () => {
+                        try {
+                          setLoading(true);
+                          const res = await (await import('@/lib/api')).updateStudentFees({ studentId: selectedStudent.studentID || selectedStudent.id, totalFees: Number(editedTotalFees), performedBy: 'Frontend User' });
+                          if (res.ok) {
+                            toast({ title: 'تم تحديث الرسوم', description: 'Total fees updated' });
+                            setEditingFees(false);
+                            // Refresh student info
+                            await handleSearch();
+                            try { window.dispatchEvent(new CustomEvent('finance.updated')); } catch(e) {}
+                          } else {
+                            toast({ title: 'فشل التحديث', description: res.message || 'Failed to update' , variant: 'destructive' });
+                          }
+                        } catch (err) {
+                          toast({ title: 'خطأ', description: 'Failed to update fees', variant: 'destructive' });
+                        } finally { setLoading(false); }
+                      }} className="bg-primary">Save</Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditingFees(false)}>Cancel</Button>
+                    </span>
+                  )}
                 </p>
               </div>
               <div className="text-center p-4 bg-background/50 rounded-lg">

@@ -469,6 +469,16 @@ class StudentService {
 
     await googleSheets.updateRow('Master_Students', student.rowIndex, updatedRow);
 
+    // Log action for undo
+    try {
+      const actionId = uuidv4();
+      const ts = moment().format('YYYY-MM-DD HH:mm:ss');
+      const details = { before: { totalFees: student.totalFees, discountPercent: student.discountPercent, discountAmount: student.discountAmount, netAmount: student.netAmount, remainingBalance: student.remainingBalance }, after: { discountPercent, discountAmount, netAmount, remainingBalance } };
+      await googleSheets.appendRows('Actions_Log', [[actionId, ts, 'apply_discount', student.studentId, 'Frontend User', JSON.stringify(details)]]);
+    } catch (err) {
+      console.error('Warning: failed to log action for applyDiscount:', err && err.message ? err.message : err);
+    }
+
     return {
       studentId: student.studentId,
       name: student.name,
@@ -478,6 +488,65 @@ class StudentService {
       netAmount,
       totalPaid: student.totalPaid,
       remainingBalance
+    };
+  }
+
+  // Update a student's Total_Fees (base fees). Recalculate discount, net amount, remaining balance and update sheets.
+  async updateStudentFees(studentId, newTotalFees, performedBy = 'System') {
+    const student = await this.getStudentInfo(studentId);
+    if (!student) throw new Error('Student not found');
+
+    const totalFees = Number(newTotalFees) || 0;
+    const discountPercent = Number(student.discountPercent || student.Discount_Percent || 0) || 0;
+    const discountAmount = Number(student.discountAmount || (totalFees * discountPercent / 100)) || 0;
+    const netAmount = Math.round(totalFees - discountAmount);
+    const totalPaid = Number(student.totalPaid || 0) || 0;
+    const remainingBalance = Math.round(netAmount - totalPaid);
+
+    const updatedRow = [
+      student.studentId,
+      student.name,
+      student.year,
+      student.numberOfSubjects,
+      totalFees,
+      discountPercent,
+      discountAmount,
+      netAmount,
+      totalPaid,
+      remainingBalance,
+      student.phoneNumber,
+      student.enrollmentDate,
+      remainingBalance <= 0 ? 'Paid' : student.status || 'Active',
+      student.lastPaymentDate || ''
+    ];
+
+    // Update Master sheet
+    await googleSheets.updateRow('Master_Students', student.rowIndex, updatedRow);
+
+    // Log action for undo
+    try {
+      const actionId = uuidv4();
+      const ts = moment().format('YYYY-MM-DD HH:mm:ss');
+      const details = { before: { totalFees: student.totalFees, netAmount: student.netAmount, remainingBalance: student.remainingBalance }, after: { totalFees, netAmount, remainingBalance } };
+      await googleSheets.appendRows('Actions_Log', [[actionId, ts, 'update_fees', student.studentId, performedBy, JSON.stringify(details)]]);
+    } catch (err) {
+      console.error('Warning: failed to log action for updateStudentFees:', err && err.message ? err.message : err);
+    }
+
+    // Sync grade sheets and analytics
+    try {
+      await this.syncGradeSheetsFromMaster();
+      const summary = await financeService.getFinancialSummary();
+      await googleSheets.writeAnalytics(summary);
+    } catch (err) {
+      console.error('Warning: failed to sync sheets after fee update:', err && err.message ? err.message : err);
+    }
+
+    return {
+      success: true,
+      studentId: student.studentId,
+      before: { totalFees: student.totalFees, netAmount: student.netAmount, remainingBalance: student.remainingBalance },
+      after: { totalFees, netAmount, remainingBalance }
     };
   }
 
@@ -499,8 +568,9 @@ class StudentService {
     const installmentAmount = student.netAmount / numberOfInstallments;
     const installmentNumber = Math.ceil(newTotalPaid / installmentAmount);
 
+    const paymentId = this.generatePaymentId();
     const paymentRow = [
-      this.generatePaymentId(),
+      paymentId,
       student.studentId,
       student.name,
       paymentDate,
@@ -515,6 +585,16 @@ class StudentService {
     ];
 
     await googleSheets.appendRows('Payments_Log', [paymentRow]);
+
+    // Log payment action for undo (store before snapshot)
+    try {
+      const actionId = uuidv4();
+      const ts = paymentDate;
+      const details = { before: { totalPaid: student.totalPaid, remainingBalance: student.remainingBalance }, paymentRow };
+      await googleSheets.appendRows('Actions_Log', [[actionId, ts, 'student_payment', paymentId, processedBy, JSON.stringify(details)]]);
+    } catch (err) {
+      console.error('Warning: failed to log action for payment:', err && err.message ? err.message : err);
+    }
 
     const updatedStudentRow = [
       student.studentId,
@@ -535,17 +615,14 @@ class StudentService {
 
     await googleSheets.updateRow('Master_Students', student.rowIndex, updatedStudentRow);
 
-    // If the payment method is not cash, record it as a bank deposit as well
-    try {
-      if (String(paymentMethod || '').toLowerCase() !== 'cash') {
-        // Use the paymentMethod as a bank descriptor when no explicit bank name is provided
-        const bankName = String(paymentMethod || 'Unknown');
-        await financeService.recordBankDeposit(amountPaid, bankName, processedBy, `Auto: student payment ${student.studentId}`);
-      }
-    } catch (err) {
-      // Log but don't fail the payment flow if deposit recording fails
-      console.error('Warning: failed to record bank deposit for non-cash payment:', err && err.message ? err.message : err);
-    }
+    // Note: Electronic payments (Visa, Instapay, etc.) go directly to bank account
+    // and are already counted as income through student fees collection.
+    // Bank deposits should only be used for manual cash-to-bank transfers,
+    // not for electronic payments to avoid double-counting.
+    
+    // Only record as bank deposit if it's an explicit cash-to-bank transfer
+    // For now, we'll remove the automatic bank deposit recording for electronic payments
+    // to prevent double-counting in financial calculations.
 
     // After recording payment, refresh overdue checks so any resolved overdue entries are removed
     try {
