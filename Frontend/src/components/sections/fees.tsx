@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { savePayment, updateStudentDiscount, getStudentByIdentifier, API_CF } from "@/lib/api";
+import { savePayment, updateStudentDiscount, getStudentByIdentifier, API_CF, updateStudentFees } from "@/lib/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { 
   Search, 
@@ -409,10 +409,10 @@ export function Fees() {
                   ) : (
                     <span className="flex items-center justify-center gap-2">
                       <input type="number" className="w-32 rounded-md border px-2 py-1" value={editedTotalFees} onChange={(e) => setEditedTotalFees(e.target.value)} />
-                      <Button size="sm" onClick={async () => {
+                      <Button type="button" size="sm" onClick={async () => {
                         try {
                           setLoading(true);
-                          const res = await (await import('@/lib/api')).updateStudentFees({ studentId: selectedStudent.studentID || selectedStudent.id, totalFees: Number(editedTotalFees), performedBy: 'Frontend User' });
+                          const res = await updateStudentFees({ studentId: selectedStudent.studentID || selectedStudent.id, totalFees: Number(editedTotalFees), performedBy: 'Frontend User' });
                           if (res.ok) {
                             toast({ title: 'تم تحديث الرسوم', description: 'Total fees updated' });
                             setEditingFees(false);
