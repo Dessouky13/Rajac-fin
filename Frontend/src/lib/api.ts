@@ -4,7 +4,7 @@
 // deployed backend URL so the site doesn't attempt to call localhost from the
 // user's browser. This fallback is intentionally explicit so you can change it.
 const BUILD_API_BASE = (import.meta.env?.VITE_API_BASE_URL as string) || '';
-const DEPLOYED_FALLBACK = 'https://rajac-finance-backend-dzcp5vj26q-uc.a.run.app';
+const DEPLOYED_FALLBACK = 'https://rajac-finance-backend-804662144673.us-central1.run.app';
 const API_BASE = BUILD_API_BASE || DEPLOYED_FALLBACK;
 if (!BUILD_API_BASE) {
   // Helpful debug message in browser console when a client-side build used default
