@@ -680,6 +680,36 @@ app.post('/api/admin/installments', async (req, res) => {
   }
 });
 
+app.post('/api/admin/delete-old-sheets', async (req, res) => {
+  try {
+    const results = await googleSheets.deleteOldGradeSheets();
+    return res.json({ success: true, message: 'Old grade sheets deleted', data: results });
+  } catch (error) {
+    console.error('Error deleting old sheets:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+app.post('/api/admin/backup', async (req, res) => {
+  try {
+    const result = await googleSheets.createBackup();
+    return res.json({ success: true, message: 'Backup created', data: result });
+  } catch (error) {
+    console.error('Error creating backup:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+app.post('/api/admin/undo', async (req, res) => {
+  try {
+    const result = await googleSheets.restoreFromBackup();
+    return res.json({ success: true, message: 'Last action undone', data: result });
+  } catch (error) {
+    console.error('Error undoing last action:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Compact analytics payload for chatbot consumption
 app.get('/api/analytics/chat', async (req, res) => {
   try {

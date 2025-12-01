@@ -344,6 +344,18 @@ export async function updateInstallments(data: Array<{ number: number; date: str
   return apiSend('/admin/installments', { installments: data }, 'POST');
 }
 
+export async function deleteOldGradeSheets(): Promise<ApiResponse<any>> {
+  return apiSend('/admin/delete-old-sheets', {}, 'POST');
+}
+
+export async function createBackup(): Promise<ApiResponse<any>> {
+  return apiSend('/admin/backup', {}, 'POST');
+}
+
+export async function undoLastAction(): Promise<ApiResponse<any>> {
+  return apiSend('/admin/undo', {}, 'POST');
+}
+
 interface DueReportItem {
   StudentID: string;
   FullName: string;

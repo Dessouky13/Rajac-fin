@@ -300,6 +300,61 @@ class GoogleSheetsService {
     }
   }
 
+  async deleteSheet(sheetName) {
+    try {
+      // First, get all sheets to find the sheetId
+      const response = await this.sheets.spreadsheets.get({
+        spreadsheetId: this.spreadsheetId
+      });
+
+      const sheet = response.data.sheets.find(s => s.properties.title === sheetName);
+      if (!sheet) {
+        console.log(`Sheet ${sheetName} not found`);
+        return { success: false, message: `Sheet ${sheetName} not found` };
+      }
+
+      // Delete the sheet by sheetId
+      await this.sheets.spreadsheets.batchUpdate({
+        spreadsheetId: this.spreadsheetId,
+        resource: {
+          requests: [{
+            deleteSheet: {
+              sheetId: sheet.properties.sheetId
+            }
+          }]
+        }
+      });
+
+      console.log(`Deleted sheet: ${sheetName}`);
+      return { success: true, message: `Sheet ${sheetName} deleted` };
+    } catch (error) {
+      console.error(`Error deleting sheet ${sheetName}:`, error);
+      throw error;
+    }
+  }
+
+  async deleteOldGradeSheets() {
+    try {
+      const sheetsToDelete = ['Grade_1', 'Grade_2', 'Grade_3', 'Grade_4', 'Grade_5', 'Grade_6', 'Grade_7', 'Grade_8'];
+      const results = [];
+
+      for (const sheetName of sheetsToDelete) {
+        try {
+          const result = await this.deleteSheet(sheetName);
+          results.push(result);
+        } catch (err) {
+          console.error(`Failed to delete ${sheetName}:`, err.message);
+          results.push({ success: false, sheet: sheetName, message: err.message });
+        }
+      }
+
+      return results;
+    } catch (error) {
+      console.error('Error deleting old grade sheets:', error);
+      throw error;
+    }
+  }
+
   async clearAllData() {
     try {
       const sheetsToClear = [
@@ -392,6 +447,77 @@ class GoogleSheetsService {
       return Buffer.from(res.data);
     } catch (error) {
       console.error('Error exporting master sheet:', error);
+      throw error;
+    }
+  }
+
+  async createBackup() {
+    try {
+      // Create a backup by copying all critical sheets data to memory
+      const sheetsToBackup = [
+        'Master_Students',
+        'Grade_9', 'Grade_10', 'Grade_11', 'Grade_12',
+        'Payments_Log',
+        'In_Out_Transactions',
+        'Bank_Deposits',
+        'Overdue_Payments'
+      ];
+
+      const backup = {
+        timestamp: moment().format('YYYY-MM-DD HH:mm:ss'),
+        sheets: {}
+      };
+
+      for (const sheetName of sheetsToBackup) {
+        try {
+          const data = await this.getSheetData(sheetName);
+          backup.sheets[sheetName] = data;
+        } catch (err) {
+          console.error(`Error backing up sheet ${sheetName}:`, err.message);
+        }
+      }
+
+      // Store backup in memory with a timestamp key (limited to last backup only for simplicity)
+      this.lastBackup = backup;
+      console.log('Backup created successfully');
+      return { success: true, timestamp: backup.timestamp };
+    } catch (error) {
+      console.error('Error creating backup:', error);
+      throw error;
+    }
+  }
+
+  async restoreFromBackup() {
+    try {
+      if (!this.lastBackup) {
+        return { success: false, message: 'No backup available' };
+      }
+
+      const sheetsToRestore = Object.keys(this.lastBackup.sheets);
+      const results = [];
+
+      for (const sheetName of sheetsToRestore) {
+        try {
+          const data = this.lastBackup.sheets[sheetName];
+          if (data && data.length > 0) {
+            // Clear the sheet first
+            await this.clearSheet(sheetName);
+            // Restore headers if present
+            if (data.length > 0) {
+              await this.appendRows(sheetName, data);
+            }
+            results.push({ sheet: sheetName, success: true });
+          }
+        } catch (err) {
+          console.error(`Error restoring sheet ${sheetName}:`, err.message);
+          results.push({ sheet: sheetName, success: false, error: err.message });
+        }
+      }
+
+      console.log('Restore completed');
+      return { success: true, message: 'Backup restored', results };
+    } catch (error) {
+      console.error('Error restoring from backup:', error);
       throw error;
     }
   }

@@ -169,12 +169,7 @@ export function Fees() {
             ...prev,
             discountPct: String(normalizedStudent.discountPct || '')
           }));
-          
-          // Reset grade filter after successful selection
-          setTimeout(() => {
-            setSelectedGrade('All');
-            setStudentsByGrade([]);
-          }, 150);
+          // Keep the grade and student list visible after selection
         }
       } catch (error) {
         console.error('Error selecting student from grade dropdown:', error);
