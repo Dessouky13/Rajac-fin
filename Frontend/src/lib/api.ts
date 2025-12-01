@@ -4,7 +4,7 @@
 // deployed backend URL so the site doesn't attempt to call localhost from the
 // user's browser. This fallback is intentionally explicit so you can change it.
 const BUILD_API_BASE = (import.meta.env?.VITE_API_BASE_URL as string) || '';
-const DEPLOYED_FALLBACK = 'https://rajac-finance-backend-dzcp5vj26q-uc.a.run.app';
+const DEPLOYED_FALLBACK = 'https://rajac-finance-backend-157566300470.us-central1.run.app';
 const API_BASE = BUILD_API_BASE || DEPLOYED_FALLBACK;
 if (!BUILD_API_BASE) {
   // Helpful debug message in browser console when a client-side build used default
@@ -17,6 +17,7 @@ const API_BASE_URL = API_BASE.endsWith('/') ? API_BASE + 'api' : API_BASE + '/ap
 // Exported constant for other parts of the app that still use fetch directly.
 // This value already includes the trailing '/api' segment (e.g. https://.../api)
 export const API_CF = API_BASE_URL;
+export const API_BASE_NO_SLASH = API_BASE;
 
 interface ApiResponse<T = any> {
   ok: boolean;

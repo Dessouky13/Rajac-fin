@@ -6,7 +6,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { MoreHorizontal } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import rajacLogo from "@/assets/rajac-logo-hd.png";
-import { downloadMasterSheet, deleteAllData, updateInstallments, deleteOldGradeSheets, createBackup, undoLastAction } from "@/lib/api";
+import { downloadMasterSheet, deleteAllData, updateInstallments, createBackup, undoLastAction } from "@/lib/api";
 
 export function Header() {
   const { isArabic, setIsArabic, t } = useLanguage();
@@ -73,9 +73,6 @@ export function Header() {
                 }
               }}>
                 ↶ Undo Last Action
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={async () => { if (confirm('Delete OLD grade sheets (1-8)? This cannot be undone.')) { await deleteOldGradeSheets(); alert('Old grade sheets deleted'); } }}>
-                Delete Old Grade Sheets (1-8)
               </DropdownMenuItem>
               <DropdownMenuItem onClick={async () => { if (confirm('Delete ALL data? This cannot be undone.')) { await deleteAllData(); alert('All data deleted'); } }}>
                 Delete All Data

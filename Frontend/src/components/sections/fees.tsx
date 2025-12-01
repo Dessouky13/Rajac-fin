@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { savePayment, updateStudentDiscount, getStudentByIdentifier } from "@/lib/api";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { API_CF } from "@/lib/api";
 import { 
   Search, 
   User, 
@@ -124,7 +125,7 @@ export function Fees() {
       }
 
       try {
-        const res = await fetch('http://localhost:3000/api/students');
+        const res = await fetch(`${API_CF}/students`);
         const data = await res.json();
         const raw = data.students || [];
         const filtered = raw.filter((s: any) => {

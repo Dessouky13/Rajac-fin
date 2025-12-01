@@ -14,7 +14,7 @@ import {
   Phone
 } from "lucide-react";
 
-import { getStudentByIdentifier } from "@/lib/api";
+import { getStudentByIdentifier, API_CF } from "@/lib/api";
 import { ProcessDriveStudentsButton } from "./process-drive-students-btn";
 import { useToast } from "@/hooks/use-toast";
 
@@ -31,7 +31,7 @@ export function Students() {
   // Fetch all students from backend
   const fetchStudents = () => {
     setLoading(true);
-    fetch("http://localhost:3000/api/students")
+    fetch(`${API_CF}/students`)
       .then(res => res.json())
       .then(data => {
         const raw = data.students || [];
@@ -103,7 +103,7 @@ export function Students() {
     }
     setAddLoading(true);
     try {
-      const res = await fetch("http://localhost:3000/api/students/upload", {
+      const res = await fetch(`${API_CF}/students/upload`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
