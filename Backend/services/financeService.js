@@ -312,23 +312,49 @@ class FinanceService {
         const expensesFromTx = (transactionsByMonth[m] && transactionsByMonth[m].expenses) || 0;
         const feesCollected = paymentsByMonth[m] || 0;
         const depositsAmt = depositsByMonth[m] || 0;
-        const net = (incomeFromTx + feesCollected + depositsAmt) - expensesFromTx;
-        return { month: m, income: incomeFromTx, expenses: expensesFromTx, feesCollected, deposits: depositsAmt, net };
+
+        // Total income = student fees + other income (IN transactions)
+        const totalMonthlyIncome = feesCollected + incomeFromTx;
+
+        // Net calculation: total income - expenses (deposits are transfers, not income)
+        const net = totalMonthlyIncome - expensesFromTx;
+
+        return {
+          month: m,
+          totalIncome: Math.round(totalMonthlyIncome * 100) / 100,
+          studentFees: Math.round(feesCollected * 100) / 100,
+          otherIncome: Math.round(incomeFromTx * 100) / 100,
+          expenses: Math.round(expensesFromTx * 100) / 100,
+          deposits: Math.round(depositsAmt * 100) / 100,
+          netProfit: Math.round(net * 100) / 100
+        };
       });
 
       // Recent items (latest 20)
       recent.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
       const recentItems = recent.slice(0, 20);
 
+      // Calculate overall totals with clarity
+      const overallTotalIncome = totalStudentPayments + totalIncome;
+      const overallNetProfit = overallTotalIncome - totalExpenses;
+      const totalLiquidAssets = totalCashInHand + totalInBank;
+
       return {
+        // Liquidity Overview
         cash: {
           totalCashInHand: Math.max(0, Math.round(totalCashInHand * 100) / 100),
-          description: 'Current cash available'
+          description: 'Current cash available in hand'
         },
         bank: {
           totalInBank: Math.round(totalInBank * 100) / 100,
-          description: 'Total amount deposited in bank'
+          description: 'Total amount in bank accounts'
         },
+        liquidity: {
+          totalLiquidAssets: Math.round(totalLiquidAssets * 100) / 100,
+          description: 'Total cash + bank balance'
+        },
+
+        // Student Financial Overview
         students: {
           totalStudents,
           activeStudents,
@@ -337,14 +363,27 @@ class FinanceService {
           totalOutstanding: Math.round(totalOutstanding * 100) / 100,
           collectionRate: totalFeesExpected > 0
             ? ((totalFeesCollected / totalFeesExpected) * 100).toFixed(2) + '%'
-            : '0%'
+            : '0%',
+          description: 'All student fee statistics'
         },
-        transactions: {
-          totalIncome: Math.round((totalIncome + totalStudentPayments) * 100) / 100,
+
+        // Overall Financial Performance
+        financial: {
+          totalIncome: Math.round(overallTotalIncome * 100) / 100,
+          studentFeesIncome: Math.round(totalStudentPayments * 100) / 100,
+          otherIncome: Math.round(totalIncome * 100) / 100,
           totalExpenses: Math.round(totalExpenses * 100) / 100,
-          netProfit: Math.round(((totalIncome + totalStudentPayments) - totalExpenses) * 100) / 100
+          netProfit: Math.round(overallNetProfit * 100) / 100,
+          profitMargin: overallTotalIncome > 0
+            ? ((overallNetProfit / overallTotalIncome) * 100).toFixed(2) + '%'
+            : '0%',
+          description: 'Overall income, expenses, and profit'
         },
+
+        // Monthly Breakdown
         monthly,
+
+        // Recent Activity
         recent: recentItems
       };
     } catch (error) {
