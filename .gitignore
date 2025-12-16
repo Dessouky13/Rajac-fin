@@ -18,3 +18,4 @@ google-sa-key.json
 
 # Node modules
 node_modules/
+Backend/deploy.log
