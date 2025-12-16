@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { API_CF } from "@/lib/api";
 
 export function ProcessDriveStudentsButton() {
   const [loading, setLoading] = useState(false);
@@ -9,7 +10,7 @@ export function ProcessDriveStudentsButton() {
   const handleProcess = async () => {
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:3000/api/students/process-drive", {
+      const res = await fetch(`${API_CF}/students/process-drive`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });

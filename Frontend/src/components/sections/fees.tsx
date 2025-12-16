@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { savePayment, updateStudentDiscount, getStudentByIdentifier, updateStudentTotalFees } from "@/lib/api";
+import { savePayment, updateStudentDiscount, getStudentByIdentifier, updateStudentTotalFees, API_CF } from "@/lib/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
   Search,
@@ -137,7 +137,7 @@ export function Fees() {
       }
 
       try {
-        const res = await fetch('http://localhost:3000/api/students');
+        const res = await fetch(`${API_CF}/students`);
         const data = await res.json();
         const raw = data.students || [];
         const filtered = raw.filter((s: any) => {
