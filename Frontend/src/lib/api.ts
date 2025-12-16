@@ -223,6 +223,16 @@ export async function updateStudentDiscount(data: {
   return apiSend('/payments/apply-discount', data, 'POST');
 }
 
+// Update student total fees
+export async function updateStudentTotalFees(data: {
+  studentId: string;
+  totalFees: number;
+  updatedBy?: string;
+}): Promise<ApiResponse<any>> {
+  const { studentId, totalFees, updatedBy } = data;
+  return apiSend(`/students/${studentId}/total-fees`, { totalFees, updatedBy }, 'PUT');
+}
+
 // Bank deposit API calls
 export async function saveBankDeposit(data: {
   amount: number;

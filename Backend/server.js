@@ -13,6 +13,9 @@ const paymentDueService = require('./services/paymentDueService');
 const driveWatcher = require('./services/driveWatcher');
 // const whatsappService = require('./services/whatsappService'); // WhatsApp service disabled for now
 
+// Import authorization middleware
+const { requireAuth, requireAdmin, rateLimit, auditLog } = require('./middleware/auth');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -502,6 +505,93 @@ app.post('/api/payments/apply-discount', async (req, res) => {
     res.status(500).json({
       error: 'Failed to apply discount',
       message: error.message
+    });
+  }
+});
+
+// Update student total fees with comprehensive validation and atomic updates
+app.put('/api/students/:studentId/total-fees', requireAuth, rateLimit(20, 60000), auditLog('UPDATE_STUDENT_TOTAL_FEES'), async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const { totalFees, updatedBy } = req.body;
+
+    console.log(`[API] Update total fees request for student ${studentId}:`, { totalFees, updatedBy });
+
+    // Validation
+    if (!studentId) {
+      return res.status(400).json({
+        error: 'Missing student ID',
+        message: 'Student ID is required in URL parameters'
+      });
+    }
+
+    if (totalFees === undefined || totalFees === null) {
+      return res.status(400).json({
+        error: 'Missing required field',
+        message: 'totalFees is required in request body'
+      });
+    }
+
+    // Convert to number and validate
+    const newTotalFees = parseFloat(totalFees);
+
+    if (isNaN(newTotalFees)) {
+      return res.status(400).json({
+        error: 'Invalid input',
+        message: 'totalFees must be a valid number'
+      });
+    }
+
+    if (newTotalFees < 0) {
+      return res.status(400).json({
+        error: 'Invalid input',
+        message: 'totalFees cannot be negative'
+      });
+    }
+
+    if (newTotalFees > 1000000) {
+      return res.status(400).json({
+        error: 'Invalid input',
+        message: 'totalFees exceeds maximum allowed amount (1,000,000 EGP)'
+      });
+    }
+
+    // Call service method with atomic transaction logic
+    const result = await studentService.updateStudentTotalFees(
+      studentId,
+      newTotalFees,
+      updatedBy || 'Frontend User'
+    );
+
+    console.log(`[API] Successfully updated total fees for student ${studentId}`);
+
+    res.json({
+      success: true,
+      message: 'Student total fees updated successfully',
+      data: result
+    });
+  } catch (error) {
+    console.error('[API] Error updating student total fees:', error);
+
+    // Distinguish between different error types
+    if (error.message === 'Student not found') {
+      return res.status(404).json({
+        error: 'Student not found',
+        message: `No student found with ID: ${req.params.studentId}`
+      });
+    }
+
+    if (error.message.includes('required') || error.message.includes('must be') || error.message.includes('cannot be')) {
+      return res.status(400).json({
+        error: 'Validation error',
+        message: error.message
+      });
+    }
+
+    // Generic server error
+    res.status(500).json({
+      error: 'Failed to update student total fees',
+      message: error.message || 'An unexpected error occurred'
     });
   }
 });

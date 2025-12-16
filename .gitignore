@@ -7,3 +7,14 @@ Backend/service-account-key.json
 **/google-*-key*.json
 google-sa-key.json
 .vercel
+
+# Claude Code settings
+.claude/
+
+# Netlify build output
+.netlify/
+**/dist/
+**/build/
+
+# Node modules
+node_modules/

@@ -6,16 +6,25 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { savePayment, updateStudentDiscount, getStudentByIdentifier } from "@/lib/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { savePayment, updateStudentDiscount, getStudentByIdentifier, updateStudentTotalFees } from "@/lib/api";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { 
-  Search, 
-  User, 
+import {
+  Search,
+  User,
   DollarSign,
   CreditCard,
   Calendar,
   Percent,
-  Save
+  Save,
+  Edit2
 } from "lucide-react";
 
 interface Student {
@@ -59,6 +68,10 @@ export function Fees() {
   });
   const [canEditDiscount, setCanEditDiscount] = useState(false);
   const { toast } = useToast();
+
+  // Edit Total Fees dialog state
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editTotalFeesValue, setEditTotalFeesValue] = useState("");
 
   const handleSearch = async () => {
     if (!searchName.trim()) {
@@ -260,10 +273,10 @@ export function Fees() {
     try {
       // Save previous state for undo
       setPreviousStudentState(JSON.parse(JSON.stringify(selectedStudent)));
-      
+
       // Include discount if updated
       const discountPct = paymentForm.discountPct ? parseFloat(paymentForm.discountPct) : undefined;
-      
+
       const response = await savePayment({
         studentId: selectedStudent.studentID || selectedStudent.id,
         amountPaid: paymentAmount,
@@ -277,7 +290,7 @@ export function Fees() {
           title: "تم حفظ الدفع بنجاح",
           description: `تم تسجيل دفع ${paymentForm.amount} جنيه للطالب ${selectedStudent.name}`,
         });
-        
+
         // Update student data with response from backend - use the student object from response
         // Backend may return the updated student in several shapes. Prefer explicit student object,
         // otherwise fall back to the top-level data payload. If not available, re-fetch the student
@@ -307,7 +320,7 @@ export function Fees() {
         } catch (e) {
           // ignore if dispatching fails in non-browser contexts
         }
-        
+
         // Reset form but keep discount
         setPaymentForm(prev => ({
           discountPct: prev.discountPct,
@@ -329,6 +342,108 @@ export function Fees() {
       toast({
         title: "خطأ في الحفظ",
         description: "حدث خطأ أثناء حفظ الدفع",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle opening the edit total fees dialog
+  const handleOpenEditDialog = () => {
+    if (!selectedStudent) return;
+    setEditTotalFeesValue(String(selectedStudent.baseFees || selectedStudent.fees || 0));
+    setIsEditDialogOpen(true);
+  };
+
+  // Handle saving the updated total fees
+  const handleSaveTotalFees = async () => {
+    if (!selectedStudent) return;
+
+    // Validation
+    const newTotalFees = parseFloat(editTotalFeesValue);
+
+    if (isNaN(newTotalFees)) {
+      toast({
+        title: t("خطأ في الإدخال", "Invalid Input"),
+        description: t("يجب إدخال رقم صحيح", "Please enter a valid number"),
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (newTotalFees < 0) {
+      toast({
+        title: t("خطأ في الإدخال", "Invalid Input"),
+        description: t("لا يمكن أن تكون الرسوم سالبة", "Total fees cannot be negative"),
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (newTotalFees > 1000000) {
+      toast({
+        title: t("خطأ في الإدخال", "Invalid Input"),
+        description: t("الرسوم تتجاوز الحد الأقصى المسموح (1,000,000 جنيه)", "Total fees exceed maximum allowed (1,000,000 EGP)"),
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Save previous state for undo
+      setPreviousStudentState(JSON.parse(JSON.stringify(selectedStudent)));
+
+      const response = await updateStudentTotalFees({
+        studentId: selectedStudent.studentID || selectedStudent.id || '',
+        totalFees: newTotalFees,
+        updatedBy: 'Frontend User'
+      });
+
+      if (response.ok && response.data) {
+        toast({
+          title: t("تم تحديث الرسوم بنجاح", "Fees Updated Successfully"),
+          description: t(
+            `تم تحديث إجمالي الرسوم إلى ${newTotalFees.toLocaleString()} جنيه`,
+            `Total fees updated to ${newTotalFees.toLocaleString()} EGP`
+          ),
+        });
+
+        // Update local student state with new values from backend
+        const updatedData = response.data.student || response.data;
+        setSelectedStudent({
+          ...selectedStudent,
+          baseFees: updatedData.totalFees || newTotalFees,
+          fees: updatedData.totalFees || newTotalFees,
+          discountPct: updatedData.discountPercent || selectedStudent.discountPct,
+          netFees: updatedData.netAmount || 0,
+          netAmount: updatedData.netAmount || 0,
+          unpaid: updatedData.remainingBalance || 0,
+          remainingAmount: updatedData.remainingBalance || 0,
+          remaining: updatedData.remainingBalance || 0
+        });
+
+        // Close dialog
+        setIsEditDialogOpen(false);
+
+        // Notify other parts of the UI to refresh
+        try {
+          window.dispatchEvent(new CustomEvent('finance.updated'));
+        } catch (e) {
+          // ignore if dispatching fails
+        }
+      } else {
+        toast({
+          title: t("فشل في تحديث الرسوم", "Failed to Update Fees"),
+          description: response.message || t("حدث خطأ أثناء تحديث الرسوم", "An error occurred while updating fees"),
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: t("خطأ في التحديث", "Update Error"),
+        description: t("حدث خطأ أثناء تحديث الرسوم", "An error occurred while updating fees"),
         variant: "destructive"
       });
     } finally {
@@ -446,11 +561,22 @@ export function Fees() {
                 <p className="text-sm text-muted-foreground">{t("الصف", "Grade")}</p>
                 <p className="text-lg font-semibold">{selectedStudent.grade}</p>
               </div>
-              <div className="text-center p-4 bg-background/50 rounded-lg">
+              <div className="text-center p-4 bg-background/50 rounded-lg relative">
                 <p className="text-sm text-muted-foreground">{t("إجمالي الرسوم", "Total Fees")}</p>
-                <p className="text-lg font-semibold text-primary">
-                  {(selectedStudent.baseFees || selectedStudent.fees || 0).toLocaleString()} {t("جنيه", "EGP")}
-                </p>
+                <div className="flex items-center justify-center gap-2">
+                  <p className="text-lg font-semibold text-primary">
+                    {(selectedStudent.baseFees || selectedStudent.fees || 0).toLocaleString()} {t("جنيه", "EGP")}
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={handleOpenEditDialog}
+                    title={t("تعديل إجمالي الرسوم", "Edit Total Fees")}
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               <div className="text-center p-4 bg-background/50 rounded-lg">
                 <p className="text-sm text-muted-foreground">{t("المبلغ بعد الخصم", "Net Amount")}</p>
@@ -573,6 +699,79 @@ export function Fees() {
           </CardContent>
         </Card>
       )}
+
+      {/* Edit Total Fees Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]" dir={isArabic ? "rtl" : "ltr"}>
+          <DialogHeader>
+            <DialogTitle className={`flex items-center gap-2 ${isArabic ? 'flex-row-reverse' : ''}`}>
+              <Edit2 className="h-5 w-5" />
+              <span>{t("تعديل إجمالي الرسوم", "Edit Total Fees")}</span>
+            </DialogTitle>
+            <DialogDescription>
+              {t(
+                "قم بتعديل إجمالي الرسوم للطالب. سيتم إعادة حساب جميع المبالغ تلقائياً.",
+                "Edit the student's total fees. All amounts will be automatically recalculated."
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="editTotalFees">
+                {t("إجمالي الرسوم (جنيه مصري)", "Total Fees (EGP)")}
+              </Label>
+              <Input
+                id="editTotalFees"
+                type="number"
+                min="0"
+                max="1000000"
+                step="0.01"
+                value={editTotalFeesValue}
+                onChange={(e) => setEditTotalFeesValue(e.target.value)}
+                placeholder={t("أدخل إجمالي الرسوم", "Enter total fees")}
+                className="text-lg"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSaveTotalFees();
+                  }
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                {t(
+                  "سيتم إعادة حساب: الخصم، المبلغ الصافي، المبلغ المتبقي",
+                  "Will recalculate: Discount, Net Amount, Remaining Balance"
+                )}
+              </p>
+            </div>
+            {selectedStudent && (
+              <div className="bg-muted p-3 rounded-lg space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">{t("الطالب:", "Student:")}</span>
+                  <span className="font-medium">{selectedStudent.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">{t("الرسوم الحالية:", "Current Fees:")}</span>
+                  <span className="font-medium">{(selectedStudent.baseFees || 0).toLocaleString()} {t("جنيه", "EGP")}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">{t("الرسوم الجديدة:", "New Fees:")}</span>
+                  <span className="font-medium text-primary">
+                    {editTotalFeesValue ? parseFloat(editTotalFeesValue).toLocaleString() : '0'} {t("جنيه", "EGP")}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter className={isArabic ? "flex-row-reverse" : ""}>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} disabled={loading}>
+              {t("إلغاء", "Cancel")}
+            </Button>
+            <Button onClick={handleSaveTotalFees} disabled={loading}>
+              {loading ? t("جاري الحفظ...", "Saving...") : t("حفظ", "Save")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

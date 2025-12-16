@@ -436,3 +436,43 @@ Proprietary - RAJAC Language School
 ---
 
 **Built with ❤️ for RAJAC Language School**
+
+---
+
+## 🔄 How to Deploy New Changes (GitHub & GCP)
+
+Whenever you want to update production, always follow these steps:
+
+### 1. Make Changes Locally
+- Edit your code as needed on your local machine.
+
+### 2. Commit and Push to GitHub
+```bash
+git add .
+git commit -m "Describe your update"
+git push origin main
+```
+
+### 3. Deploy to Google Cloud Run (GCP)
+- Make sure your local code matches GitHub (production):
+```bash
+git pull origin main
+```
+- Build and push the Docker image from the Backend directory:
+```bash
+gcloud builds submit --tag gcr.io/dogwood-harmony-459220-n7/rajac-finance-backend ./Backend
+```
+- Deploy the new image to Cloud Run:
+```bash
+gcloud run deploy rajac-finance-backend \
+  --image gcr.io/dogwood-harmony-459220-n7/rajac-finance-backend \
+  --region us-central1 \
+  --platform managed
+```
+
+**Tip:**
+- Always check that your code is up to date with GitHub before deploying.
+- You must be authenticated with `gcloud auth login` and have the correct project set: `gcloud config set project YOUR_PROJECT_ID`
+- The service URL will be shown after deployment.
+
+---

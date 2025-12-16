@@ -538,6 +538,154 @@ class StudentService {
 
     return updates.length;
   }
+
+  /**
+   * Update student's total fees amount with comprehensive validation and atomic updates
+   * @param {string} studentId - Student ID
+   * @param {number} newTotalFees - New total fees amount
+   * @param {string} updatedBy - User who made the update (for audit logging)
+   * @returns {Promise<Object>} Updated student data
+   */
+  async updateStudentTotalFees(studentId, newTotalFees, updatedBy = 'System') {
+    try {
+      console.log(`[updateStudentTotalFees] Starting update for student ${studentId} with new fees: ${newTotalFees}`);
+
+      // Input validation
+      if (!studentId) {
+        throw new Error('Student ID is required');
+      }
+
+      if (typeof newTotalFees !== 'number' || isNaN(newTotalFees)) {
+        throw new Error('New total fees must be a valid number');
+      }
+
+      if (newTotalFees < 0) {
+        throw new Error('Total fees cannot be negative');
+      }
+
+      // Validate reasonable range (0 to 1,000,000 EGP)
+      if (newTotalFees > 1000000) {
+        throw new Error('Total fees exceeds maximum allowed amount (1,000,000 EGP)');
+      }
+
+      // Get current student data
+      const student = await this.getStudentInfo(studentId);
+      if (!student) {
+        throw new Error('Student not found');
+      }
+
+      console.log(`[updateStudentTotalFees] Current student data:`, {
+        studentId: student.studentId,
+        name: student.name,
+        currentTotalFees: student.totalFees,
+        newTotalFees
+      });
+
+      // Calculate all derived fields based on new total fees
+      const discountPercent = student.discountPercent || 0;
+      const discountAmount = Math.round((newTotalFees * discountPercent) / 100);
+      const netAmount = Math.round(newTotalFees - discountAmount);
+      const totalPaid = student.totalPaid || 0;
+      const remainingBalance = Math.round(netAmount - totalPaid);
+      const status = remainingBalance <= 0 ? 'Paid' : 'Active';
+
+      console.log(`[updateStudentTotalFees] Calculated values:`, {
+        discountPercent,
+        discountAmount,
+        netAmount,
+        totalPaid,
+        remainingBalance,
+        status
+      });
+
+      // Prepare updated row for Master_Students
+      const updatedRow = [
+        student.studentId,
+        student.name,
+        student.year,
+        student.numberOfSubjects,
+        newTotalFees,          // Updated total fees
+        discountPercent,
+        discountAmount,        // Recalculated
+        netAmount,             // Recalculated
+        totalPaid,
+        remainingBalance,      // Recalculated
+        student.phoneNumber,
+        student.enrollmentDate,
+        status,                // May change based on new balance
+        student.lastPaymentDate
+      ];
+
+      // Atomic update to Master_Students sheet
+      console.log(`[updateStudentTotalFees] Updating Master_Students row ${student.rowIndex}`);
+      await googleSheets.updateRow('Master_Students', student.rowIndex, updatedRow);
+
+      // Update Analytics sheet
+      try {
+        console.log(`[updateStudentTotalFees] Updating Analytics sheet`);
+        const summary = await financeService.getFinancialSummary();
+        const overdueStudents = await paymentDueService.getOverdueStudents();
+        await googleSheets.writeAnalytics(summary, overdueStudents.length);
+      } catch (err) {
+        console.error('[updateStudentTotalFees] Warning: failed to update analytics:', err.message);
+        // Continue execution - analytics update failure shouldn't block the main operation
+      }
+
+      // Sync grade sheets from master
+      try {
+        console.log(`[updateStudentTotalFees] Syncing grade sheets`);
+        await this.syncGradeSheetsFromMaster();
+      } catch (err) {
+        console.error('[updateStudentTotalFees] Warning: failed to sync grade sheets:', err.message);
+        // Continue execution
+      }
+
+      // Check and update overdue payments
+      try {
+        console.log(`[updateStudentTotalFees] Checking overdue payments`);
+        await paymentDueService.checkOverduePayments();
+      } catch (err) {
+        console.error('[updateStudentTotalFees] Warning: failed to update overdue payments:', err.message);
+        // Continue execution
+      }
+
+      console.log(`[updateStudentTotalFees] Successfully updated student ${studentId}`);
+
+      // Return updated student data
+      return {
+        success: true,
+        student: {
+          studentId: student.studentId,
+          name: student.name,
+          year: student.year,
+          numberOfSubjects: student.numberOfSubjects,
+          totalFees: newTotalFees,
+          discountPercent,
+          discountAmount,
+          netAmount,
+          totalPaid,
+          remainingBalance,
+          phoneNumber: student.phoneNumber,
+          enrollmentDate: student.enrollmentDate,
+          status,
+          lastPaymentDate: student.lastPaymentDate
+        },
+        changes: {
+          oldTotalFees: student.totalFees,
+          newTotalFees,
+          oldNetAmount: student.netAmount,
+          newNetAmount: netAmount,
+          oldRemainingBalance: student.remainingBalance,
+          newRemainingBalance: remainingBalance
+        },
+        updatedBy,
+        updatedAt: moment().format('YYYY-MM-DD HH:mm:ss')
+      };
+    } catch (error) {
+      console.error(`[updateStudentTotalFees] Error updating student total fees:`, error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new StudentService();
