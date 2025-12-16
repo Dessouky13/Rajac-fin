@@ -818,10 +818,11 @@ app.get('/api/analytics/chat', async (req, res) => {
         outstanding: summary?.students?.totalOutstanding || 0
       },
       kpis: {
-        totalIncome: summary?.transactions?.totalIncome || 0,
-        totalExpenses: summary?.transactions?.totalExpenses || 0,
-        netProfit: summary?.transactions?.netProfit || 0,
-        collectionRate: summary?.students?.collectionRate || '0%'
+        totalIncome: summary?.financial?.totalIncome || 0,
+        totalExpenses: summary?.financial?.totalExpenses || 0,
+        netProfit: summary?.financial?.netProfit || 0,
+        collectionRate: summary?.students?.collectionRate || '0%',
+        profitMargin: summary?.financial?.profitMargin || '0%'
       },
       monthly: (summary?.monthly || []).slice(-12), // last up to 12 months
       recent: (summary?.recent || []).slice(0, 10),

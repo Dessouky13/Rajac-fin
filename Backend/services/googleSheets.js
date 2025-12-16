@@ -389,9 +389,12 @@ class GoogleSheetsService {
         ['Total Fees Collected', summary?.students?.totalFeesCollected || 0, '', now],
         ['Total Outstanding', summary?.students?.totalOutstanding || 0, '', now],
         ['Collection Rate', summary?.students?.collectionRate || '0%', '', now],
-        ['Total Income', summary?.transactions?.totalIncome || 0, '', now],
-        ['Total Expenses', summary?.transactions?.totalExpenses || 0, '', now],
-        ['Net Profit', summary?.transactions?.netProfit || 0, '', now],
+        ['Total Income', summary?.financial?.totalIncome || 0, '', now],
+        ['Student Fees Income', summary?.financial?.studentFeesIncome || 0, '', now],
+        ['Other Income', summary?.financial?.otherIncome || 0, '', now],
+        ['Total Expenses', summary?.financial?.totalExpenses || 0, '', now],
+        ['Net Profit', summary?.financial?.netProfit || 0, '', now],
+        ['Profit Margin', summary?.financial?.profitMargin || '0%', '', now],
         ['Total Overdue Students', overdueCount || 0, '', now]
       ];
 
@@ -399,9 +402,18 @@ class GoogleSheetsService {
       const monthlyRows = [];
       if (Array.isArray(summary?.monthly) && summary.monthly.length > 0) {
         monthlyRows.push(['--']);
-        monthlyRows.push(['Monthly Breakdown (YYYY-MM)', 'Income', 'Expenses', 'Fees Collected', 'Deposits', 'Net', 'Last_Updated']);
+        monthlyRows.push(['Monthly Breakdown (YYYY-MM)', 'Total Income', 'Student Fees', 'Other Income', 'Expenses', 'Deposits', 'Net Profit', 'Last_Updated']);
         summary.monthly.forEach(m => {
-          monthlyRows.push([m.month, m.income || 0, m.expenses || 0, m.feesCollected || 0, m.deposits || 0, m.net || 0, now]);
+          monthlyRows.push([
+            m.month,
+            m.totalIncome || 0,
+            m.studentFees || 0,
+            m.otherIncome || 0,
+            m.expenses || 0,
+            m.deposits || 0,
+            m.netProfit || 0,
+            now
+          ]);
         });
       }
 
