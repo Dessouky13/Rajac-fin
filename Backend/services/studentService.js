@@ -368,6 +368,15 @@ class StudentService {
   }
 
   async recordPayment(studentId, amountPaid, paymentMethod, discountPercent = null, processedBy = 'System') {
+    // Create automatic backup before processing payment
+    try {
+      await googleSheets.createBackup();
+      console.log('[recordPayment] Backup created successfully');
+    } catch (backupError) {
+      console.error('[recordPayment] Warning: Failed to create backup:', backupError.message);
+      // Continue with payment even if backup fails
+    }
+
     let student = await this.getStudentInfo(studentId);
     if (!student) throw new Error('Student not found');
 
@@ -549,6 +558,15 @@ class StudentService {
   async updateStudentTotalFees(studentId, newTotalFees, updatedBy = 'System') {
     try {
       console.log(`[updateStudentTotalFees] Starting update for student ${studentId} with new fees: ${newTotalFees}`);
+
+      // Create automatic backup before making changes
+      try {
+        await googleSheets.createBackup();
+        console.log('[updateStudentTotalFees] Backup created successfully');
+      } catch (backupError) {
+        console.error('[updateStudentTotalFees] Warning: Failed to create backup:', backupError.message);
+        // Continue with update even if backup fails
+      }
 
       // Input validation
       if (!studentId) {
