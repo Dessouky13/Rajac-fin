@@ -366,6 +366,31 @@ export async function undoLastAction(): Promise<ApiResponse<any>> {
   return apiSend('/admin/undo', {}, 'POST');
 }
 
+// Teachers API
+export async function getTeachers(): Promise<ApiResponse<any[]>> {
+  const res = await apiGet<any>('/teachers');
+  if (!res.ok) return res as ApiResponse<any[]>;
+  // Backend returns { success: true, teachers: [...] }
+  return { ok: true, data: res.teachers || res.data || [] };
+}
+
+export async function addTeacher(teacher: {
+  name: string;
+  subject: string;
+  numberOfClasses: number;
+  totalAmount: number;
+}): Promise<ApiResponse<any>> {
+  return apiSend('/teachers', teacher, 'POST');
+}
+
+export async function payTeacher(payment: {
+  teacherName: string;
+  amount: number;
+  method: string;
+}): Promise<ApiResponse<any>> {
+  return apiSend('/teachers/payment', payment, 'POST');
+}
+
 interface DueReportItem {
   StudentID: string;
   FullName: string;

@@ -11,6 +11,7 @@ const studentService = require('./services/studentService');
 const financeService = require('./services/financeService');
 const paymentDueService = require('./services/paymentDueService');
 const driveWatcher = require('./services/driveWatcher');
+const teachersService = require('./services/teachersService');
 // const whatsappService = require('./services/whatsappService'); // WhatsApp service disabled for now
 
 // Import authorization middleware
@@ -168,6 +169,37 @@ app.post('/api/analytics/write', async (req, res) => {
       error: 'Failed to write analytics',
       message: error.message
     });
+  }
+});
+
+// Teachers API routes
+app.get('/api/teachers', async (req, res) => {
+  try {
+    const teachers = await teachersService.getAllTeachers();
+    res.json({ success: true, teachers });
+  } catch (error) {
+    console.error('Error getting teachers:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/teachers', async (req, res) => {
+  try {
+    const result = await teachersService.addTeacher(req.body);
+    res.json(result);
+  } catch (error) {
+    console.error('Error adding teacher:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/api/teachers/payment', async (req, res) => {
+  try {
+    const result = await teachersService.payTeacher(req.body);
+    res.json(result);
+  } catch (error) {
+    console.error('Error processing teacher payment:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
