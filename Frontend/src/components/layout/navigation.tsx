@@ -2,14 +2,15 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { 
-  Users, 
-  CreditCard, 
-  TrendingUp, 
-  Calendar, 
+import {
+  Users,
+  CreditCard,
+  TrendingUp,
+  Calendar,
   PiggyBank,
   Home,
-  FileSpreadsheet
+  FileSpreadsheet,
+  GraduationCap
 } from "lucide-react";
 
 interface NavItem {
@@ -46,13 +47,21 @@ const navItems: NavItem[] = [
     descriptionAr: "المعاملات المالية",
     descriptionEn: "Financial transactions"
   },
-  { 
-    id: "balances", 
-    labelAr: "النقد والبنك والودائع", 
+  {
+    id: "balances",
+    labelAr: "النقد والبنك والودائع",
     labelEn: "Cash, Bank & Deposits",
-    icon: PiggyBank, 
+    icon: PiggyBank,
     descriptionAr: "لوحة الأرصدة",
     descriptionEn: "Balance dashboard"
+  },
+  {
+    id: "teachers",
+    labelAr: "إدارة المعلمين",
+    labelEn: "Teachers Management",
+    icon: GraduationCap,
+    descriptionAr: "إدارة المعلمين والرواتب",
+    descriptionEn: "Manage teachers and payments"
   },
 ];
 
