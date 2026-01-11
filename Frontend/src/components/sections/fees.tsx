@@ -129,7 +129,7 @@ export function Fees() {
   };
 
   useEffect(() => {
-    // load students for the selected grade (client-side filter of /api/students)
+    // load students for the selected grade (optimized with backend filtering)
     const load = async () => {
       if (!selectedGrade || selectedGrade === 'All') {
         setStudentsByGrade([]);
@@ -137,18 +137,14 @@ export function Fees() {
       }
 
       try {
-        const res = await fetch(`${API_CF}/students`);
+        // Use backend filtering for better performance
+        const res = await fetch(`${API_CF}/students?grade=${encodeURIComponent(selectedGrade)}`);
         const data = await res.json();
         const raw = data.students || [];
-        const filtered = raw.filter((s: any) => {
-          const year = (s.Year || s.year || '').toString();
-          if (!year) return selectedGrade === 'Unknown';
-          const num = year.match(/(\d{1,3})/);
-          if (num && selectedGrade.startsWith('Grade_')) {
-            return (`Grade_${num[1]}`) === selectedGrade;
-          }
-          return (`Grade_${year.replace(/\s+/g,'_')}`) === selectedGrade;
-        }).map((s: any) => ({ id: s.Student_ID || s.studentId || s.id, name: s.Name || s.name }));
+        const filtered = raw.map((s: any) => ({
+          id: s.Student_ID || s.studentId || s.id,
+          name: s.Name || s.name
+        }));
         setStudentsByGrade(filtered);
       } catch (err) {
         console.error('Failed to load students for grade', err);

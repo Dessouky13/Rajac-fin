@@ -6,7 +6,25 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { getTeachers, addTeacher, payTeacher } from "@/lib/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { getTeachers, addTeacher, payTeacher, deleteTeacher, updateTeacher } from "@/lib/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
   User,
@@ -14,7 +32,9 @@ import {
   BookOpen,
   Hash,
   Save,
-  CreditCard
+  CreditCard,
+  Edit2,
+  Trash2
 } from "lucide-react";
 
 interface Teacher {
@@ -49,6 +69,20 @@ export function Teachers() {
     amount: "",
     method: ""
   });
+
+  // Edit teacher state
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    subject: "",
+    numberOfClasses: "",
+    totalAmount: ""
+  });
+
+  // Delete confirmation state
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
 
   useEffect(() => {
     loadTeachers();
@@ -128,6 +162,79 @@ export function Teachers() {
     }
   };
 
+  const handleOpenEditDialog = (teacher: Teacher) => {
+    setEditingTeacher(teacher);
+    setEditForm({
+      name: teacher.name,
+      subject: teacher.subject,
+      numberOfClasses: String(teacher.numberOfClasses),
+      totalAmount: String(teacher.totalAmount)
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateTeacher = async () => {
+    if (!editingTeacher) return;
+
+    try {
+      const response = await updateTeacher(editingTeacher.id, {
+        name: editForm.name,
+        subject: editForm.subject,
+        numberOfClasses: parseInt(editForm.numberOfClasses),
+        totalAmount: parseFloat(editForm.totalAmount)
+      });
+
+      if (response.ok) {
+        toast({
+          title: isArabic ? "نجح" : "Success",
+          description: isArabic ? "تم تحديث المعلم بنجاح" : "Teacher updated successfully"
+        });
+        setIsEditDialogOpen(false);
+        setEditingTeacher(null);
+        await loadTeachers();
+      } else {
+        throw new Error(response.message || "Failed to update teacher");
+      }
+    } catch (error) {
+      toast({
+        title: isArabic ? "خطأ" : "Error",
+        description: isArabic ? "فشل في تحديث المعلم" : "Failed to update teacher",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleOpenDeleteConfirm = (teacher: Teacher) => {
+    setTeacherToDelete(teacher);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!teacherToDelete) return;
+
+    try {
+      const response = await deleteTeacher(teacherToDelete.id);
+
+      if (response.ok) {
+        toast({
+          title: isArabic ? "نجح" : "Success",
+          description: isArabic ? "تم حذف المعلم بنجاح" : "Teacher deleted successfully"
+        });
+        setDeleteConfirmOpen(false);
+        setTeacherToDelete(null);
+        await loadTeachers();
+      } else {
+        throw new Error(response.message || "Failed to delete teacher");
+      }
+    } catch (error) {
+      toast({
+        title: isArabic ? "خطأ" : "Error",
+        description: isArabic ? "فشل في حذف المعلم" : "Failed to delete teacher",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -172,7 +279,7 @@ export function Teachers() {
               </div>
 
               <div>
-                <Label htmlFor="classes">{isArabic ? "عدد الحصص" : "Number of Classes"}</Label>
+                <Label htmlFor="classes">{isArabic ? "عدد الطلاب" : "Number of Students"}</Label>
                 <Input
                   id="classes"
                   type="number"
@@ -276,9 +383,31 @@ export function Teachers() {
             {teachers.map((teacher) => (
               <Card key={teacher.id} className="p-4">
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    <span className="font-medium">{teacher.name}</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      <span className="font-medium">{teacher.name}</span>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => handleOpenEditDialog(teacher)}
+                        title={isArabic ? "تعديل" : "Edit"}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive hover:text-destructive"
+                        onClick={() => handleOpenDeleteConfirm(teacher)}
+                        title={isArabic ? "حذف" : "Delete"}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <BookOpen className="h-4 w-4" />
@@ -286,7 +415,7 @@ export function Teachers() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Hash className="h-4 w-4" />
-                    <span>{teacher.numberOfClasses} {isArabic ? "حصة" : "classes"}</span>
+                    <span>{teacher.numberOfClasses} {isArabic ? "طالب" : "students"}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4" />
@@ -310,6 +439,95 @@ export function Teachers() {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Teacher Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]" dir={isArabic ? "rtl" : "ltr"}>
+          <DialogHeader>
+            <DialogTitle className={`flex items-center gap-2 ${isArabic ? 'flex-row-reverse' : ''}`}>
+              <Edit2 className="h-5 w-5" />
+              <span>{isArabic ? "تعديل بيانات المعلم" : "Edit Teacher"}</span>
+            </DialogTitle>
+            <DialogDescription>
+              {isArabic ? "قم بتعديل بيانات المعلم" : "Update teacher information"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="editName">{isArabic ? "الاسم" : "Name"}</Label>
+              <Input
+                id="editName"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                placeholder={isArabic ? "أدخل اسم المعلم" : "Enter teacher name"}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="editSubject">{isArabic ? "المادة" : "Subject"}</Label>
+              <Input
+                id="editSubject"
+                value={editForm.subject}
+                onChange={(e) => setEditForm({ ...editForm, subject: e.target.value })}
+                placeholder={isArabic ? "أدخل المادة" : "Enter subject"}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="editClasses">{isArabic ? "عدد الطلاب" : "Number of Students"}</Label>
+              <Input
+                id="editClasses"
+                type="number"
+                value={editForm.numberOfClasses}
+                onChange={(e) => setEditForm({ ...editForm, numberOfClasses: e.target.value })}
+                placeholder="10"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="editAmount">{isArabic ? "إجمالي المبلغ" : "Total Amount"}</Label>
+              <Input
+                id="editAmount"
+                type="number"
+                step="0.01"
+                value={editForm.totalAmount}
+                onChange={(e) => setEditForm({ ...editForm, totalAmount: e.target.value })}
+                placeholder="1000.00"
+              />
+            </div>
+          </div>
+          <DialogFooter className={isArabic ? "flex-row-reverse" : ""}>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              {isArabic ? "إلغاء" : "Cancel"}
+            </Button>
+            <Button onClick={handleUpdateTeacher}>
+              {isArabic ? "حفظ التعديلات" : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent dir={isArabic ? "rtl" : "ltr"}>
+          <AlertDialogHeader>
+            <AlertDialogTitle className={isArabic ? "text-right" : ""}>
+              {isArabic ? "تأكيد الحذف" : "Confirm Deletion"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className={isArabic ? "text-right" : ""}>
+              {isArabic
+                ? `هل أنت متأكد من حذف المعلم "${teacherToDelete?.name}"؟ هذا الإجراء لا يمكن التراجع عنه.`
+                : `Are you sure you want to delete teacher "${teacherToDelete?.name}"? This action cannot be undone.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className={isArabic ? "flex-row-reverse" : ""}>
+            <AlertDialogCancel>{isArabic ? "إلغاء" : "Cancel"}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isArabic ? "حذف" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -203,6 +203,28 @@ app.post('/api/teachers/payment', async (req, res) => {
   }
 });
 
+app.delete('/api/teachers/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await teachersService.deleteTeacher(id);
+    res.json(result);
+  } catch (error) {
+    console.error('Error deleting teacher:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.put('/api/teachers/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await teachersService.updateTeacher(id, req.body);
+    res.json(result);
+  } catch (error) {
+    console.error('Error updating teacher:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.get('/api/payments/overdue', async (req, res) => {
   try {
     const result = await paymentDueService.checkOverduePayments();
@@ -457,7 +479,22 @@ app.get('/api/students/search/:identifier', async (req, res) => {
 
 app.get('/api/students', async (req, res) => {
   try {
-    const students = await studentService.getAllStudents();
+    const { grade } = req.query;
+    let students = await studentService.getAllStudents();
+
+    // Filter by grade if provided
+    if (grade && grade !== 'All') {
+      students = students.filter(s => {
+        const year = (s.Year || s.year || '').toString();
+        if (!year) return grade === 'Unknown';
+        const num = year.match(/(\d{1,3})/);
+        if (num && grade.startsWith('Grade_')) {
+          return (`Grade_${num[1]}`) === grade;
+        }
+        return (`Grade_${year.replace(/\s+/g,'_')}`) === grade;
+      });
+    }
+
     res.json({
       success: true,
       total: students.length,

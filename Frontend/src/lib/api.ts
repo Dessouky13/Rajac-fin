@@ -391,6 +391,29 @@ export async function payTeacher(payment: {
   return apiSend('/teachers/payment', payment, 'POST');
 }
 
+export async function deleteTeacher(teacherId: string): Promise<ApiResponse<any>> {
+  try {
+    const url = `${API_BASE_URL}/teachers/${teacherId}`;
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const data = await response.json();
+    return { ok: data.success, ...data };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
+export async function updateTeacher(teacherId: string, updates: {
+  name?: string;
+  subject?: string;
+  numberOfClasses?: number;
+  totalAmount?: number;
+}): Promise<ApiResponse<any>> {
+  return apiSend(`/teachers/${teacherId}`, updates, 'PUT');
+}
+
 interface DueReportItem {
   StudentID: string;
   FullName: string;

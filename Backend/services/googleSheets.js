@@ -617,6 +617,74 @@ class GoogleSheetsService {
       throw error;
     }
   }
+
+  async deleteTeacher(teacherId) {
+    try {
+      const teachers = await this.getTeachers();
+      const rowIndex = teachers.findIndex(t => t.id === teacherId);
+      if (rowIndex === -1) throw new Error('Teacher not found');
+
+      // Delete the row (rowIndex + 2 because of header and 0-indexing)
+      const response = await this.sheets.spreadsheets.get({
+        spreadsheetId: this.spreadsheetId
+      });
+      const sheet = response.data.sheets.find(s => s.properties.title === 'Teachers');
+      if (!sheet) throw new Error('Teachers sheet not found');
+
+      await this.sheets.spreadsheets.batchUpdate({
+        spreadsheetId: this.spreadsheetId,
+        resource: {
+          requests: [{
+            deleteDimension: {
+              range: {
+                sheetId: sheet.properties.sheetId,
+                dimension: 'ROWS',
+                startIndex: rowIndex + 1,
+                endIndex: rowIndex + 2
+              }
+            }
+          }]
+        }
+      });
+
+      return { success: true, message: 'Teacher deleted successfully' };
+    } catch (error) {
+      console.error('Error deleting teacher:', error);
+      throw error;
+    }
+  }
+
+  async updateTeacher(teacherId, updatedTeacher) {
+    try {
+      const teachers = await this.getTeachers();
+      const rowIndex = teachers.findIndex(t => t.id === teacherId);
+      if (rowIndex === -1) throw new Error('Teacher not found');
+
+      const range = `Teachers!A${rowIndex + 2}:H${rowIndex + 2}`;
+      const values = [[
+        updatedTeacher.id,
+        updatedTeacher.name,
+        updatedTeacher.subject,
+        updatedTeacher.numberOfClasses,
+        updatedTeacher.totalAmount,
+        updatedTeacher.totalPaid,
+        updatedTeacher.remainingBalance,
+        updatedTeacher.createdAt
+      ]];
+
+      await this.sheets.spreadsheets.values.update({
+        spreadsheetId: this.spreadsheetId,
+        range,
+        valueInputOption: 'RAW',
+        resource: { values }
+      });
+
+      return { success: true, teacher: updatedTeacher };
+    } catch (error) {
+      console.error('Error updating teacher:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new GoogleSheetsService();
